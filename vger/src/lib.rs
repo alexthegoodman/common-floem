@@ -32,6 +32,7 @@ pub struct VgerRenderer {
 }
 
 impl VgerRenderer {
+    // TODO: need frame loop callback for rendering buffers, also need to return device for pipeline setup
     pub fn new(
         gpu_resources: GpuResources,
         width: u32,

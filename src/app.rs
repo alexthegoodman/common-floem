@@ -98,9 +98,9 @@ pub(crate) fn add_app_update_event(event: AppUpdateEvent) {
 /// Floem top level application
 /// This is the entry point of the application.
 pub struct Application {
-    handle: Option<ApplicationHandle>,
-    event_listener: Option<Box<AppEventCallback>>,
-    event_loop: EventLoop<UserEvent>,
+    pub handle: Option<ApplicationHandle>,
+    pub event_listener: Option<Box<AppEventCallback>>,
+    pub event_loop: EventLoop<UserEvent>,
 }
 
 impl Default for Application {
