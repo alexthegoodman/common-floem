@@ -31,7 +31,7 @@ use crate::{
     window_id::process_window_updates,
 };
 
-pub(crate) struct ApplicationHandle {
+pub struct ApplicationHandle {
     pub window_handles: HashMap<floem_winit::window::WindowId, WindowHandle>,
     pub timers: HashMap<TimerToken, Timer>,
 }

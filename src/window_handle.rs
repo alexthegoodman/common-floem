@@ -57,8 +57,8 @@ use crate::{
 /// - processing all requests to update the AppState from the reactive system
 /// - processing all requests to update the animation state from the reactive system
 /// - requesting a new animation frame from the backend
-pub(crate) struct WindowHandle {
-    pub(crate) window: Option<Arc<floem_winit::window::Window>>,
+pub struct WindowHandle {
+    pub window: Option<Arc<floem_winit::window::Window>>,
     window_id: WindowId,
     id: ViewId,
     main_view: ViewId,
@@ -74,8 +74,8 @@ pub(crate) struct WindowHandle {
     transparent: bool,
     pub(crate) scale: f64,
     pub(crate) modifiers: Modifiers,
-    pub(crate) cursor_position: Point,
-    pub(crate) window_position: Point,
+    pub cursor_position: Point,
+    pub window_position: Point,
     pub(crate) last_pointer_down: Option<(u8, Point, Instant)>,
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub(crate) context_menu: RwSignal<Option<(Menu, Point)>>,
