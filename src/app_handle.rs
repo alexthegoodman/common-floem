@@ -11,7 +11,7 @@ use web_time::Instant;
 use wgpu::web_sys;
 
 use floem_winit::{
-    dpi::{LogicalPosition, LogicalSize},
+    dpi::{LogicalPosition, LogicalSize, PhysicalSize},
     event::WindowEvent,
     event_loop::{ControlFlow, EventLoopProxy, EventLoopWindowTarget},
     window::WindowId,
@@ -80,12 +80,14 @@ impl ApplicationHandle {
         });
         for event in events {
             match event {
-                AppUpdateEvent::NewWindow { view_fn, config } => self.new_window(
-                    event_loop,
-                    event_proxy.clone(),
-                    view_fn,
-                    config.unwrap_or_default(),
-                ),
+                AppUpdateEvent::NewWindow { view_fn, config } => {
+                    self.new_window(
+                        event_loop,
+                        event_proxy.clone(),
+                        view_fn,
+                        config.unwrap_or_default(),
+                    );
+                }
                 AppUpdateEvent::CloseWindow { window_id } => {
                     self.close_window(window_id, event_loop);
                 }
@@ -220,9 +222,16 @@ impl ApplicationHandle {
                 window_handle.ime(ime);
             }
             WindowEvent::CursorMoved { position, .. } => {
-                let position: LogicalPosition<f64> = position.to_logical(window_handle.scale);
-                let point = Point::new(position.x, position.y);
+                let position_logical: LogicalPosition<f64> =
+                    position.to_logical(window_handle.scale);
+                let point = Point::new(position_logical.x, position_logical.y);
                 window_handle.pointer_move(point);
+                if (window_handle.handle_cursor_moved.is_some()) {
+                    window_handle
+                        .handle_cursor_moved
+                        .as_ref()
+                        .expect("Couldn't get callback")(position.x, position.y);
+                }
             }
             WindowEvent::CursorEntered { .. } => {}
             WindowEvent::CursorLeft { .. } => {
@@ -233,6 +242,12 @@ impl ApplicationHandle {
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 window_handle.mouse_input(button, state);
+                if (window_handle.handle_mouse_input.is_some()) {
+                    window_handle
+                        .handle_mouse_input
+                        .as_ref()
+                        .expect("Couldn't get callback")(button, state);
+                }
             }
             WindowEvent::TouchpadMagnify { .. } => {}
             WindowEvent::SmartMagnify { .. } => {}
@@ -252,6 +267,12 @@ impl ApplicationHandle {
             }
             WindowEvent::RedrawRequested => {
                 window_handle.render_frame();
+                // window_handle.call_render_callback();
+                window_handle
+                    .window
+                    .as_ref()
+                    .expect("Couldn't get window")
+                    .request_redraw();
             }
         }
 
@@ -296,8 +317,9 @@ impl ApplicationHandle {
             web_config,
             font_embolden,
         }: WindowConfig,
-    ) -> WindowId {
+    ) -> Option<WindowId> {
         let logical_size = size.map(|size| LogicalSize::new(size.width, size.height));
+        let physical_size = size.map(|size| PhysicalSize::new(size.width, size.height));
 
         let mut window_builder = floem_winit::window::WindowBuilder::new()
             .with_title(title)
@@ -337,8 +359,8 @@ impl ApplicationHandle {
             window_builder = window_builder.with_position(LogicalPosition::new(x, y));
         }
 
-        if let Some(logical_size) = logical_size {
-            window_builder = window_builder.with_inner_size(logical_size);
+        if let Some(physical_size) = physical_size {
+            window_builder = window_builder.with_inner_size(physical_size);
         }
 
         #[cfg(not(target_os = "macos"))]
@@ -410,7 +432,7 @@ impl ApplicationHandle {
         }
 
         let Ok(window) = window_builder.build(event_loop) else {
-            return;
+            return None;
         };
         let window_id = window.id();
         let window_handle = WindowHandle::new(
@@ -424,7 +446,7 @@ impl ApplicationHandle {
         );
         self.window_handles.insert(window_id, window_handle);
 
-        window_id
+        Some(window_id)
     }
 
     fn close_window(

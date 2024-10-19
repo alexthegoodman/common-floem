@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use floem_renderer::gpu_resources::GpuResources;
 use floem_renderer::swash::SwashScaler;
-use floem_renderer::text::{CacheKey, TextLayout};
+use floem_renderer::text::{self, CacheKey, TextLayout};
 use floem_renderer::{tiny_skia, Img, Renderer};
 use floem_vger_rs::{Image, PaintIndex, PixelFormat, Vger};
 use image::{DynamicImage, EncodableLayout, RgbaImage};
@@ -14,13 +14,16 @@ use peniko::{
     kurbo::{Affine, Point, Rect, Shape},
     BrushRef, Color, GradientKind,
 };
-use wgpu::{Device, DeviceType, Queue, StoreOp, Surface, SurfaceConfiguration, TextureFormat};
+use wgpu::{
+    Device, DeviceType, Queue, StoreOp, Surface, SurfaceConfiguration, TextureFormat, TextureView,
+};
 
 pub struct VgerRenderer {
-    device: Arc<Device>,
-    #[allow(unused)]
-    queue: Arc<Queue>,
-    surface: Surface<'static>,
+    // device: Arc<Device>,
+    // #[allow(unused)]
+    // queue: Arc<Queue>,
+    // surface: Surface<'static>,
+    gpu_resources: Arc<GpuResources>,
     vger: Vger,
     alt_vger: Option<Vger>,
     config: SurfaceConfiguration,
@@ -34,18 +37,23 @@ pub struct VgerRenderer {
 impl VgerRenderer {
     // TODO: need frame loop callback for rendering buffers, also need to return device for pipeline setup
     pub fn new(
-        gpu_resources: GpuResources,
+        gpu_resources: std::sync::Arc<GpuResources>,
         width: u32,
         height: u32,
         scale: f64,
         font_embolden: f32,
     ) -> Result<Self> {
-        let GpuResources {
-            surface,
-            adapter,
-            device,
-            queue,
-        } = gpu_resources;
+        // let GpuResources {
+        //     surface,
+        //     adapter,
+        //     device,
+        //     queue,
+        // } = gpu_resources;
+        let gpu_resources_ref = gpu_resources.as_ref();
+        let surface = &gpu_resources_ref.surface;
+        let adapter = &gpu_resources_ref.adapter;
+        let device = &gpu_resources_ref.device;
+        let queue = &gpu_resources_ref.queue;
 
         if adapter.get_info().device_type == DeviceType::Cpu {
             return Err(anyhow::anyhow!("only cpu adapter found"));
@@ -68,11 +76,19 @@ impl VgerRenderer {
         let queue = Arc::new(queue);
 
         let surface_caps = surface.get_capabilities(&adapter);
-        let texture_format = surface_caps
-            .formats
-            .into_iter()
-            .find(|it| matches!(it, TextureFormat::Rgba8Unorm | TextureFormat::Bgra8Unorm))
-            .ok_or_else(|| anyhow::anyhow!("surface should support Rgba8Unorm or Bgra8Unorm"))?;
+        // let texture_format = surface_caps
+        //     .formats
+        //     .into_iter()
+        //     .find(|it| {
+        //         matches!(
+        //             it,
+        //             TextureFormat::Rgba8Unorm | TextureFormat::Bgra8UnormSrgb
+        //         )
+        //     })
+        //     .ok_or_else(|| {
+        //         anyhow::anyhow!("surface should support Rgba8Unorm or Bgra8UnormSrgb")
+        //     })?;
+        let texture_format = wgpu::TextureFormat::Bgra8UnormSrgb;
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -81,17 +97,27 @@ impl VgerRenderer {
             height,
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            // alpha_mode: wgpu::CompositeAlphaMode::PreMultiplied,
+            // alpha_mode: wgpu::CompositeAlphaMode::Inherit,
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
 
-        let vger = floem_vger_rs::Vger::new(device.clone(), queue.clone(), texture_format);
+        // let vger = floem_vger_rs::Vger::new(device.clone(), queue.clone(), texture_format);
+
+        // if let Some(gpu_resources) = &window_handle.gpu_resources {
+        // let device = Arc::clone(&device);
+        // let queue = Arc::clone(&queue);
+        let vger = floem_vger_rs::Vger::new(gpu_resources.clone(), texture_format);
+        // ... rest of your code
+        // }
+
+        // let device = Arc::clone(&device.clone());
+        // let queue = Arc::clone(&queue);
 
         Ok(Self {
-            device,
-            queue,
-            surface,
+            gpu_resources,
             vger,
             alt_vger: None,
             scale,
@@ -107,7 +133,9 @@ impl VgerRenderer {
         if width != self.config.width || height != self.config.height {
             self.config.width = width;
             self.config.height = height;
-            self.surface.configure(&self.device, &self.config);
+            self.gpu_resources
+                .surface
+                .configure(&self.gpu_resources.device, &self.config);
         }
         self.scale = scale;
     }
@@ -178,7 +206,14 @@ impl VgerRenderer {
         floem_vger_rs::defs::LocalRect::new(origin, size)
     }
 
-    fn render_image(&mut self) -> Option<DynamicImage> {
+    fn render_image(
+        &mut self,
+    ) -> (
+        Option<wgpu::CommandEncoder>,
+        Option<wgpu::SurfaceTexture>,
+        Option<wgpu::TextureView>,
+        Option<DynamicImage>,
+    ) {
         let width_align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT - 1;
         let width = (self.config.width + width_align) & !width_align;
         let height = self.config.height;
@@ -196,7 +231,7 @@ impl VgerRenderer {
             label: Some("render_texture"),
             view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
         };
-        let texture = self.device.create_texture(&texture_desc);
+        let texture = self.gpu_resources.device.create_texture(&texture_desc);
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         let desc = wgpu::RenderPassDescriptor {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -213,16 +248,20 @@ impl VgerRenderer {
         self.vger.encode(&desc);
 
         let bytes_per_pixel = 4;
-        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size: (width as u64 * height as u64 * bytes_per_pixel),
-            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let buffer = self
+            .gpu_resources
+            .device
+            .create_buffer(&wgpu::BufferDescriptor {
+                label: None,
+                size: (width as u64 * height as u64 * bytes_per_pixel),
+                usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
         let bytes_per_row = width * bytes_per_pixel as u32;
         assert!(bytes_per_row % wgpu::COPY_BYTES_PER_ROW_ALIGNMENT == 0);
 
         let mut encoder = self
+            .gpu_resources
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
         encoder.copy_texture_to_buffer(
@@ -237,9 +276,10 @@ impl VgerRenderer {
             },
             texture_desc.size,
         );
-        let command_buffer = encoder.finish();
-        self.queue.submit(Some(command_buffer));
-        self.device.poll(wgpu::Maintain::Wait);
+        // TODO: reimplemnt on stunts
+        // let command_buffer = encoder.finish();
+        // self.gpu_resources.queue.submit(Some(command_buffer));
+        // self.gpu_resources.device.poll(wgpu::Maintain::Wait);
 
         let slice = buffer.slice(..);
         let (tx, rx) = sync_channel(1);
@@ -247,10 +287,12 @@ impl VgerRenderer {
 
         loop {
             if let Ok(r) = rx.try_recv() {
-                break r.ok()?;
+                break r.ok().expect("see");
             }
-            if let wgpu::MaintainResult::Ok = self.device.poll(wgpu::MaintainBase::Wait) {
-                rx.recv().ok()?.ok()?;
+            if let wgpu::MaintainResult::Ok =
+                self.gpu_resources.device.poll(wgpu::MaintainBase::Wait)
+            {
+                rx.recv().ok().expect("see").ok().expect("see");
                 break;
             }
         }
@@ -265,7 +307,13 @@ impl VgerRenderer {
             cursor += bytes_per_row as usize;
         }
 
-        RgbaImage::from_raw(self.config.width, height, cropped_buffer).map(DynamicImage::ImageRgba8)
+        (
+            Some(encoder),
+            None,
+            Some(view),
+            RgbaImage::from_raw(self.config.width, height, cropped_buffer)
+                .map(DynamicImage::ImageRgba8),
+        )
     }
 }
 
@@ -276,8 +324,7 @@ impl Renderer for VgerRenderer {
             self.capture = capture;
             if self.alt_vger.is_none() {
                 self.alt_vger = Some(floem_vger_rs::Vger::new(
-                    self.device.clone(),
-                    self.queue.clone(),
+                    self.gpu_resources.clone(),
                     TextureFormat::Rgba8Unorm,
                 ));
             }
@@ -624,11 +671,20 @@ impl Renderer for VgerRenderer {
         self.clip = None;
     }
 
-    fn finish(&mut self) -> Option<DynamicImage> {
+    fn finish(
+        &mut self,
+    ) -> (
+        Option<wgpu::CommandEncoder>,
+        Option<wgpu::SurfaceTexture>,
+        Option<TextureView>,
+        Option<DynamicImage>,
+    ) {
         if self.capture {
             self.render_image()
         } else {
-            if let Ok(frame) = self.surface.get_current_texture() {
+            // println!("testing");
+            if let Ok(frame) = self.gpu_resources.surface.get_current_texture() {
+                // TODO: overwritten by main.rs in sensor?
                 let texture_view = frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
@@ -638,7 +694,7 @@ impl Renderer for VgerRenderer {
                         view: &texture_view,
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            load: wgpu::LoadOp::Clear(wgpu::Color::RED),
                             store: StoreOp::Store,
                         },
                     })],
@@ -647,10 +703,12 @@ impl Renderer for VgerRenderer {
                     occlusion_query_set: None,
                 };
 
-                self.vger.encode(&desc);
-                frame.present();
+                let encoder = self.vger.encode(&desc);
+                // frame.present();
+
+                return (encoder, Some(frame), Some(texture_view), None);
             }
-            None
+            (None, None, None, None)
         }
     }
 }

@@ -1,5 +1,12 @@
-use std::{cell::RefCell, mem, path::PathBuf, rc::Rc, sync::Arc};
+use std::{
+    cell::RefCell,
+    mem,
+    path::PathBuf,
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
 
+use common_vector::{basic::WindowSize, editor::Editor};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{Duration, Instant};
 #[cfg(target_arch = "wasm32")]
@@ -51,6 +58,8 @@ use crate::{
     window_tracking::{remove_window_id_mapping, store_window_id_mapping},
 };
 
+pub type CustomRenderCallback = Box<dyn for<'a> Fn(&'a RefCell<&WindowHandle>) + 'static>;
+
 /// The top-level window handle that owns the winit Window.
 /// Meant only for use with the root view of the application.
 /// Owns the `AppState` and is responsible for
@@ -80,6 +89,24 @@ pub struct WindowHandle {
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub(crate) context_menu: RwSignal<Option<(Menu, Point)>>,
     dropper_file: Option<PathBuf>,
+    pub render_callback: Option<CustomRenderCallback>,
+    pub encode_callback: Option<
+        Box<
+            dyn for<'a> Fn(
+                    wgpu::CommandEncoder,
+                    wgpu::SurfaceTexture,
+                    wgpu::TextureView,
+                    &'a WindowHandle,
+                ) + 'static,
+        >,
+    >,
+    pub gpu_resources: Option<Arc<GpuResources>>,
+    pub user_editor: Option<Arc<Mutex<Editor>>>,
+    pub render_pipeline: Option<wgpu::RenderPipeline>,
+    pub depth_view: Option<wgpu::TextureView>,
+    pub window_size: Option<WindowSize>,
+    pub handle_mouse_input: Option<Box<dyn Fn(MouseButton, ElementState)>>,
+    pub handle_cursor_moved: Option<Box<dyn Fn(f64, f64)>>,
 }
 
 impl WindowHandle {
@@ -166,6 +193,15 @@ impl WindowHandle {
             context_menu,
             last_pointer_down: None,
             dropper_file: None,
+            render_callback: None,
+            gpu_resources: None, // not the Reciever, but actual resources
+            user_editor: None,
+            render_pipeline: None,
+            depth_view: None,
+            window_size: None,
+            encode_callback: None,
+            handle_mouse_input: None,
+            handle_cursor_moved: None,
         };
         window_handle.app_state.set_root_size(size.get_untracked());
         if let Some(theme) = theme.get_untracked() {
@@ -175,7 +211,8 @@ impl WindowHandle {
     }
 
     pub(crate) fn init_renderer(&mut self) {
-        self.paint_state.init_renderer();
+        self.paint_state
+            .init_renderer(self.gpu_resources.clone(), self.window_size);
         // On the web, we need to get the canvas size once. The size will be updated automatically
         // when the canvas element is resized subsequently. This is the correct place to do so
         // because the renderer is not initialized until now.
@@ -627,7 +664,56 @@ impl WindowHandle {
                 window.pre_present_notify();
             }
         }
-        cx.paint_state.renderer_mut().finish()
+        // cx.paint_state.renderer_mut().finish()
+        let (encoder, frame, view, dynamic_image) = cx.paint_state.renderer_mut().finish();
+
+        if (encoder.is_some() && frame.is_some() && view.is_some()) {
+            self.call_encode_callback(
+                encoder.expect("Couldn't get encoder"),
+                frame.expect("Couldn't get frame"),
+                view.expect("Couldn't get view"),
+            );
+        } else {
+            println!("Requesting redraw...");
+            self.window
+                .as_ref()
+                .expect("Window as ref")
+                .request_redraw();
+        }
+
+        dynamic_image
+    }
+
+    pub fn set_encode_callback(
+        &mut self,
+        callback: Box<
+            dyn for<'a> Fn(
+                    wgpu::CommandEncoder,
+                    wgpu::SurfaceTexture,
+                    wgpu::TextureView,
+                    &'a WindowHandle,
+                ) + 'static,
+        >,
+    ) {
+        self.encode_callback = Some(callback);
+    }
+
+    // pub fn call_encode_callback(&self) {
+    //     if let Some(callback) = &self.encode_callback {
+    //         let window_handle_ref = RefCell::new(self);
+    //         callback(&window_handle_ref);
+    //     }
+    // }
+
+    pub fn call_encode_callback(
+        &mut self,
+        command_encoder: wgpu::CommandEncoder,
+        frame: wgpu::SurfaceTexture,
+        view: wgpu::TextureView,
+    ) {
+        if let Some(callback) = &self.encode_callback {
+            callback(command_encoder, frame, view, self);
+        }
     }
 
     pub(crate) fn capture(&mut self) -> Capture {

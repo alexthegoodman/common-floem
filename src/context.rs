@@ -1,6 +1,8 @@
+use common_vector::basic::WindowSize;
 use floem_reactive::Scope;
-use floem_renderer::gpu_resources::{GpuResourceError, GpuResources};
+use floem_renderer::gpu_resources::{self, GpuResourceError, GpuResources};
 use floem_renderer::Renderer as FloemRenderer;
+use floem_winit::dpi::PhysicalSize;
 use peniko::kurbo::{Affine, Point, Rect, RoundedRect, Shape, Size, Vec2};
 use std::{
     ops::{Deref, DerefMut},
@@ -1197,20 +1199,20 @@ impl<'a> PaintCx<'a> {
 pub enum PaintState {
     /// The renderer is not yet initialized. This state is used to wait for the GPU resources to be acquired.
     PendingGpuResources {
-        pub window: Arc<dyn wgpu::WindowHandle>,
-        pub rx: crossbeam::channel::Receiver<Result<GpuResources, GpuResourceError>>,
-        pub font_embolden: f32,
+        window: Arc<dyn wgpu::WindowHandle>,
+        rx: crossbeam::channel::Receiver<Result<GpuResources, GpuResourceError>>,
+        font_embolden: f32,
         /// This field holds an instance of `Renderer::Uninitialized` until the GPU resources are acquired,
         /// which will be returned in `PaintState::renderer` and `PaintState::renderer_mut`.
         /// All calls to renderer methods will be no-ops until the renderer is initialized.
         ///
         /// Previously, `PaintState::renderer` and `PaintState::renderer_mut` would panic if called when the renderer was uninitialized.
         /// However, this turned out to be hard to handle properly and led to panics, especially since the rest of the application code can't control when the renderer is initialized.
-        pub renderer: crate::renderer::Renderer<Arc<dyn wgpu::WindowHandle>>,
+        renderer: crate::renderer::Renderer<Arc<dyn wgpu::WindowHandle>>,
     },
     /// The renderer is initialized and ready to paint.
     Initialized {
-        pub renderer: crate::renderer::Renderer<Arc<dyn wgpu::WindowHandle>>,
+        renderer: crate::renderer::Renderer<Arc<dyn wgpu::WindowHandle>>,
     },
 }
 
@@ -1230,7 +1232,11 @@ impl PaintState {
         }
     }
 
-    pub(crate) fn init_renderer(&mut self) {
+    pub fn init_renderer(
+        &mut self,
+        gpu_resources: Option<std::sync::Arc<GpuResources>>,
+        inner_size: Option<WindowSize>,
+    ) {
         if let PaintState::PendingGpuResources {
             window,
             rx,
@@ -1238,12 +1244,15 @@ impl PaintState {
             renderer,
         } = self
         {
-            let gpu_resources = rx.recv().unwrap().unwrap();
+            // let gpu_resources = rx.recv().unwrap().unwrap();
+            let gpu_resources = gpu_resources.expect("Couldn't get resources");
+            let inner_size = inner_size.expect("Couldn't get inner size");
             let renderer = crate::renderer::Renderer::new(
                 window.clone(),
-                gpu_resources,
+                gpu_resources.clone(),
                 renderer.scale(),
-                renderer.size(),
+                // renderer.size(),
+                Size::new(inner_size.width as f64, inner_size.height as f64),
                 *font_embolden,
             );
             *self = PaintState::Initialized { renderer };

@@ -47,8 +47,10 @@
 //! - Only one view can be active at a time.
 //! - Only one view can be focused at a time.
 //!
+use std::sync::Arc;
+
 use crate::text::TextLayout;
-use floem_renderer::gpu_resources::GpuResources;
+use floem_renderer::gpu_resources::{self, GpuResources};
 use floem_renderer::Img;
 use floem_tiny_skia_renderer::TinySkiaRenderer;
 use floem_vger_renderer::VgerRenderer;
@@ -71,7 +73,7 @@ pub enum Renderer<W> {
 impl<W: wgpu::WindowHandle> Renderer<W> {
     pub fn new(
         window: W,
-        gpu_resources: GpuResources,
+        gpu_resources: std::sync::Arc<GpuResources>,
         scale: f64,
         size: Size,
         font_embolden: f32,
@@ -85,6 +87,8 @@ impl<W: wgpu::WindowHandle> Renderer<W> {
             .ok()
             .map(|val| val.as_str() == "1")
             .unwrap_or(false);
+
+        let gpu_resources = Arc::clone(&gpu_resources);
 
         let vger_err = if !force_tiny_skia {
             match VgerRenderer::new(
@@ -288,11 +292,18 @@ impl<W: wgpu::WindowHandle> floem_renderer::Renderer for Renderer<W> {
         }
     }
 
-    fn finish(&mut self) -> Option<DynamicImage> {
+    fn finish(
+        &mut self,
+    ) -> (
+        Option<wgpu::CommandEncoder>,
+        Option<wgpu::SurfaceTexture>,
+        Option<wgpu::TextureView>,
+        Option<DynamicImage>,
+    ) {
         match self {
             Renderer::Vger(r) => r.finish(),
             Renderer::TinySkia(r) => r.finish(),
-            Renderer::Uninitialized { .. } => None,
+            Renderer::Uninitialized { .. } => (None, None, None, None),
         }
     }
 }

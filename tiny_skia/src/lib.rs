@@ -544,7 +544,15 @@ impl<W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle
         self.clip = None;
     }
 
-    fn finish(&mut self) -> Option<DynamicImage> {
+    fn finish(
+        &mut self,
+        // encode_callback: F,
+    ) -> (
+        Option<wgpu::CommandEncoder>,
+        Option<wgpu::SurfaceTexture>,
+        Option<wgpu::TextureView>,
+        Option<DynamicImage>,
+    ) {
         // Remove cache entries which were not accessed.
         self.image_cache.retain(|_, (c, _)| *c == self.cache_color);
         self.glyph_cache.retain(|_, (c, _)| *c == self.cache_color);
@@ -567,6 +575,6 @@ impl<W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle
             .present()
             .expect("failed to present the surface buffer");
 
-        None
+        (None, None, None, None)
     }
 }

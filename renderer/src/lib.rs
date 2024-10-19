@@ -53,5 +53,14 @@ pub trait Renderer {
 
     fn draw_img(&mut self, img: Img<'_>, rect: Rect);
 
-    fn finish(&mut self) -> Option<DynamicImage>;
+    fn finish(
+        &mut self,
+    ) -> (
+        Option<wgpu::CommandEncoder>,
+        Option<wgpu::SurfaceTexture>,
+        Option<wgpu::TextureView>,
+        Option<DynamicImage>,
+    );
+    // where
+    //     F: FnOnce(&Self, &mut wgpu::CommandEncoder);
 }

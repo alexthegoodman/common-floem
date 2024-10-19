@@ -13,22 +13,22 @@ use crate::view::IntoView;
 /// Configures various attributes (e.g. size, position, transparency, etc.) of a window.
 #[derive(Debug)]
 pub struct WindowConfig {
-    pub(crate) size: Option<Size>,
-    pub(crate) position: Option<Point>,
-    pub(crate) show_titlebar: bool,
-    pub(crate) transparent: bool,
-    pub(crate) fullscreen: Option<Fullscreen>,
-    pub(crate) window_icon: Option<Icon>,
-    pub(crate) title: String,
-    pub(crate) enabled_buttons: WindowButtons,
-    pub(crate) resizable: bool,
-    pub(crate) undecorated: bool,
-    pub(crate) window_level: WindowLevel,
-    pub(crate) apply_default_theme: bool,
-    pub(crate) font_embolden: f32,
+    pub size: Option<Size>,
+    pub position: Option<Point>,
+    pub show_titlebar: bool,
+    pub transparent: bool,
+    pub fullscreen: Option<Fullscreen>,
+    pub window_icon: Option<Icon>,
+    pub title: String,
+    pub enabled_buttons: WindowButtons,
+    pub resizable: bool,
+    pub undecorated: bool,
+    pub window_level: WindowLevel,
+    pub apply_default_theme: bool,
+    pub font_embolden: f32,
     #[allow(dead_code)]
-    pub(crate) mac_os_config: Option<MacOSWindowConfig>,
-    pub(crate) web_config: Option<WebWindowConfig>,
+    pub mac_os_config: Option<MacOSWindowConfig>,
+    pub web_config: Option<WebWindowConfig>,
 }
 
 impl Default for WindowConfig {

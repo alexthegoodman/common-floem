@@ -41,7 +41,8 @@ thread_local! {
 ///
 /// To build an application and windows with more configuration, see [`Application`].
 pub fn launch<V: IntoView + 'static>(app_view: impl FnOnce() -> V + 'static) {
-    Application::new().window(move |_| app_view(), None).run()
+    let (app, window_id) = Application::new().window(move |_| app_view(), None);
+    app.run()
 }
 
 pub enum AppEvent {
@@ -50,7 +51,7 @@ pub enum AppEvent {
 }
 
 #[derive(Debug)]
-pub(crate) enum UserEvent {
+pub enum UserEvent {
     AppUpdate,
     Idle,
     QuitApp,
@@ -144,7 +145,7 @@ impl Application {
         mut self,
         app_view: impl FnOnce(WindowId) -> V + 'static,
         config: Option<WindowConfig>,
-    ) -> (Self, WindowId) {
+    ) -> (Self, Option<WindowId>) {
         let window_id = self.handle.as_mut().unwrap().new_window(
             &self.event_loop,
             self.event_loop.create_proxy(),
