@@ -144,14 +144,14 @@ impl Application {
         mut self,
         app_view: impl FnOnce(WindowId) -> V + 'static,
         config: Option<WindowConfig>,
-    ) -> Self {
-        self.handle.as_mut().unwrap().new_window(
+    ) -> (Self, WindowId) {
+        let window_id = self.handle.as_mut().unwrap().new_window(
             &self.event_loop,
             self.event_loop.create_proxy(),
             Box::new(|window_id| app_view(window_id).into_any()),
             config.unwrap_or_default(),
         );
-        self
+        (self, window_id)
     }
 
     pub fn run(mut self) {

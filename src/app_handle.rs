@@ -274,7 +274,7 @@ impl ApplicationHandle {
         self.handle_updates_for_all_windows();
     }
 
-    pub(crate) fn new_window(
+    pub fn new_window(
         &mut self,
         event_loop: &EventLoopWindowTarget<UserEvent>,
         event_proxy: EventLoopProxy<UserEvent>,
@@ -296,7 +296,7 @@ impl ApplicationHandle {
             web_config,
             font_embolden,
         }: WindowConfig,
-    ) {
+    ) -> WindowId {
         let logical_size = size.map(|size| LogicalSize::new(size.width, size.height));
 
         let mut window_builder = floem_winit::window::WindowBuilder::new()
@@ -423,6 +423,8 @@ impl ApplicationHandle {
             font_embolden,
         );
         self.window_handles.insert(window_id, window_handle);
+
+        window_id
     }
 
     fn close_window(
