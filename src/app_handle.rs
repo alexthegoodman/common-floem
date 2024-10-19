@@ -32,8 +32,8 @@ use crate::{
 };
 
 pub(crate) struct ApplicationHandle {
-    window_handles: HashMap<floem_winit::window::WindowId, WindowHandle>,
-    timers: HashMap<TimerToken, Timer>,
+    pub window_handles: HashMap<floem_winit::window::WindowId, WindowHandle>,
+    pub timers: HashMap<TimerToken, Timer>,
 }
 
 impl ApplicationHandle {

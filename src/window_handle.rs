@@ -65,7 +65,7 @@ pub(crate) struct WindowHandle {
     /// Reactive Scope for this WindowHandle
     scope: Scope,
     app_state: AppState,
-    paint_state: PaintState,
+    pub paint_state: PaintState,
     size: RwSignal<Size>,
     theme: Option<Theme>,
     pub(crate) profile: Option<Profile>,
