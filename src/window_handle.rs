@@ -16,7 +16,7 @@ use floem_reactive::{with_scope, RwSignal, Scope, SignalGet, SignalUpdate};
 use floem_renderer::gpu_resources::GpuResources;
 use floem_renderer::Renderer;
 use floem_winit::{
-    dpi::{LogicalPosition, LogicalSize},
+    dpi::{LogicalPosition, LogicalSize, PhysicalSize},
     event::{ElementState, Ime, MouseButton, MouseScrollDelta},
     event_loop::EventLoopProxy,
     keyboard::{Key, ModifiersState, NamedKey},
@@ -69,7 +69,7 @@ pub type CustomRenderCallback = Box<dyn for<'a> Fn(&'a RefCell<&WindowHandle>) +
 pub struct WindowHandle {
     pub window: Option<Arc<floem_winit::window::Window>>,
     window_id: WindowId,
-    id: ViewId,
+    pub id: ViewId,
     main_view: ViewId,
     /// Reactive Scope for this WindowHandle
     scope: Scope,
@@ -107,6 +107,8 @@ pub struct WindowHandle {
     pub window_size: Option<WindowSize>,
     pub handle_mouse_input: Option<Box<dyn Fn(MouseButton, ElementState)>>,
     pub handle_cursor_moved: Option<Box<dyn Fn(f64, f64)>>,
+    pub handle_window_resized: Option<Box<dyn FnMut(PhysicalSize<u32>, LogicalSize<f64>)>>,
+    pub gpu_helper: Option<Arc<Mutex<GpuHelper>>>,
 }
 
 impl WindowHandle {
@@ -202,6 +204,8 @@ impl WindowHandle {
             encode_callback: None,
             handle_mouse_input: None,
             handle_cursor_moved: None,
+            handle_window_resized: None,
+            gpu_helper: None,
         };
         window_handle.app_state.set_root_size(size.get_untracked());
         if let Some(theme) = theme.get_untracked() {
@@ -1659,5 +1663,45 @@ impl View for WindowView {
 
     fn debug_name(&self) -> std::borrow::Cow<'static, str> {
         "Window".into()
+    }
+}
+
+pub struct GpuHelper {
+    pub depth_view: Option<wgpu::TextureView>,
+}
+
+impl GpuHelper {
+    pub fn new() -> Self {
+        GpuHelper { depth_view: None }
+    }
+
+    pub fn recreate_depth_view(
+        &mut self,
+        gpu_resources: &std::sync::Arc<GpuResources>,
+        window_size: &WindowSize,
+    ) {
+        let depth_texture = gpu_resources
+            .device
+            .create_texture(&wgpu::TextureDescriptor {
+                size: wgpu::Extent3d {
+                    width: window_size.width.clone(),
+                    height: window_size.height.clone(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Depth24Plus,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+                label: Some("Depth Texture"),
+                view_formats: &[],
+            });
+
+        let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.depth_view = Some(depth_view);
+
+        // (depth_texture, depth_view)
     }
 }

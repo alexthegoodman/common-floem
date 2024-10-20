@@ -183,9 +183,17 @@ impl ApplicationHandle {
         match event {
             WindowEvent::ActivationTokenDone { .. } => {}
             WindowEvent::Resized(size) => {
-                let size: LogicalSize<f64> = size.to_logical(window_handle.scale);
-                let size = Size::new(size.width, size.height);
-                window_handle.size(size);
+                let logical_size: LogicalSize<f64> = size.to_logical(window_handle.scale);
+                let kurbo_size = Size::new(logical_size.width, logical_size.height);
+
+                if (window_handle.handle_window_resized.is_some()) {
+                    window_handle
+                        .handle_window_resized
+                        .as_mut()
+                        .expect("Couldn't get callback")(size, logical_size);
+                }
+
+                window_handle.size(kurbo_size);
             }
             WindowEvent::Moved(position) => {
                 let position: LogicalPosition<f64> = position.to_logical(window_handle.scale);

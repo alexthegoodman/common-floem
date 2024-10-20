@@ -682,9 +682,7 @@ impl Renderer for VgerRenderer {
         if self.capture {
             self.render_image()
         } else {
-            // println!("testing");
             if let Ok(frame) = self.gpu_resources.surface.get_current_texture() {
-                // TODO: overwritten by main.rs in sensor?
                 let texture_view = frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
