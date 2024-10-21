@@ -1674,11 +1674,15 @@ impl View for WindowView {
 
 pub struct GpuHelper {
     pub depth_view: Option<wgpu::TextureView>,
+    pub gpu_resources: Option<std::sync::Arc<GpuResources>>,
 }
 
 impl GpuHelper {
     pub fn new() -> Self {
-        GpuHelper { depth_view: None }
+        GpuHelper {
+            depth_view: None,
+            gpu_resources: None,
+        }
     }
 
     pub fn recreate_depth_view(
