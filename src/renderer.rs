@@ -298,12 +298,13 @@ impl<W: wgpu::WindowHandle> floem_renderer::Renderer for Renderer<W> {
         Option<wgpu::CommandEncoder>,
         Option<wgpu::SurfaceTexture>,
         Option<wgpu::TextureView>,
+        Option<wgpu::TextureView>,
         Option<DynamicImage>,
     ) {
         match self {
             Renderer::Vger(r) => r.finish(),
             Renderer::TinySkia(r) => r.finish(),
-            Renderer::Uninitialized { .. } => (None, None, None, None),
+            Renderer::Uninitialized { .. } => (None, None, None, None, None),
         }
     }
 }

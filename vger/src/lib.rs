@@ -212,6 +212,7 @@ impl VgerRenderer {
         Option<wgpu::CommandEncoder>,
         Option<wgpu::SurfaceTexture>,
         Option<wgpu::TextureView>,
+        Option<wgpu::TextureView>,
         Option<DynamicImage>,
     ) {
         let width_align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT - 1;
@@ -309,6 +310,7 @@ impl VgerRenderer {
 
         (
             Some(encoder),
+            None,
             None,
             Some(view),
             RgbaImage::from_raw(self.config.width, height, cropped_buffer)
@@ -677,36 +679,121 @@ impl Renderer for VgerRenderer {
         Option<wgpu::CommandEncoder>,
         Option<wgpu::SurfaceTexture>,
         Option<TextureView>,
+        Option<TextureView>,
         Option<DynamicImage>,
     ) {
         if self.capture {
             self.render_image()
         } else {
+            // Create a multisampled texture (do this once, not every frame)
+            let multisampled_texture =
+                self.gpu_resources
+                    .device
+                    .create_texture(&wgpu::TextureDescriptor {
+                        size: wgpu::Extent3d {
+                            width: self.config.width,
+                            height: self.config.height,
+                            depth_or_array_layers: 1,
+                        },
+                        mip_level_count: 1,
+                        sample_count: 4, // Match this with your depth texture
+                        dimension: wgpu::TextureDimension::D2,
+                        format: self.config.format,
+                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                        label: Some("Multisampled render texture"),
+                        view_formats: &[],
+                    });
+
+            let multisampled_view =
+                multisampled_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
             if let Ok(frame) = self.gpu_resources.surface.get_current_texture() {
                 let texture_view = frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
+
+                // let multisampled_depth_texture =
+                //     self.gpu_resources
+                //         .device
+                //         .create_texture(&wgpu::TextureDescriptor {
+                //             size: wgpu::Extent3d {
+                //                 width: self.config.width,
+                //                 height: self.config.height,
+                //                 depth_or_array_layers: 1,
+                //             },
+                //             mip_level_count: 1,
+                //             sample_count: 4,
+                //             dimension: wgpu::TextureDimension::D2,
+                //             format: wgpu::TextureFormat::Depth24Plus,
+                //             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                //             label: Some("Multisampled Depth Texture"),
+                //             view_formats: &[],
+                //         });
+
+                // let depth_view =
+                //     multisampled_depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
                 let desc = wgpu::RenderPassDescriptor {
                     label: None,
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &texture_view,
-                        resolve_target: None,
+                        view: &multisampled_view,            // Use the multisampled view here
+                        resolve_target: Some(&texture_view), // Resolve to the swapchain texture
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::RED),
+                            load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
                             store: StoreOp::Store,
                         },
                     })],
+                    // depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    //     view: &self.depth_view.as_ref().unwrap(), // Your multisampled depth view
+                    //     depth_ops: Some(wgpu::Operations {
+                    //         load: wgpu::LoadOp::Clear(1.0),
+                    //         store: true,
+                    //     }),
+                    //     stencil_ops: None,
+                    // }),
                     depth_stencil_attachment: None,
+                    // depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    //     view: &depth_view,
+                    //     depth_ops: Some(wgpu::Operations {
+                    //         load: wgpu::LoadOp::Clear(1.0),
+                    //         store: StoreOp::Store,
+                    //     }),
+                    //     stencil_ops: None,
+                    // }),
                     timestamp_writes: None,
                     occlusion_query_set: None,
                 };
+                // if let Ok(frame) = self.gpu_resources.surface.get_current_texture() {
+                //     let texture_view = frame
+                //         .texture
+                //         .create_view(&wgpu::TextureViewDescriptor::default());
+                // let desc = wgpu::RenderPassDescriptor {
+                //     label: None,
+                //     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                //         view: &texture_view,
+                //         resolve_target: None,
+                //         ops: wgpu::Operations {
+                //             load: wgpu::LoadOp::Clear(wgpu::Color::RED),
+                //             store: StoreOp::Store,
+                //         },
+                //     })],
+                //     depth_stencil_attachment: None,
+                //     timestamp_writes: None,
+                //     occlusion_query_set: None,
+                // };
 
                 let encoder = self.vger.encode(&desc);
                 // frame.present();
 
-                return (encoder, Some(frame), Some(texture_view), None);
+                return (
+                    encoder,
+                    Some(frame),
+                    Some(multisampled_view),
+                    Some(texture_view),
+                    None,
+                );
             }
-            (None, None, None, None)
+            (None, None, None, None, None)
         }
     }
 }

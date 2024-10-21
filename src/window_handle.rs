@@ -96,6 +96,7 @@ pub struct WindowHandle {
                     wgpu::CommandEncoder,
                     wgpu::SurfaceTexture,
                     wgpu::TextureView,
+                    wgpu::TextureView,
                     &'a WindowHandle,
                 ) + 'static,
         >,
@@ -645,11 +646,12 @@ impl WindowHandle {
             .begin(cx.app_state.capture.is_some());
         if !self.transparent {
             let scale = cx.app_state.scale;
-            let color = self
-                .theme
-                .as_ref()
-                .map(|theme| theme.background)
-                .unwrap_or(peniko::Color::WHITE);
+            // let color = self
+            //     .theme
+            //     .as_ref()
+            //     .map(|theme| theme.background)
+            //     .unwrap_or(peniko::Color::RED);
+            let color = peniko::Color::TRANSPARENT;
             // fill window with default white background if it's not transparent
             cx.fill(
                 &self
@@ -669,13 +671,15 @@ impl WindowHandle {
             }
         }
         // cx.paint_state.renderer_mut().finish()
-        let (encoder, frame, view, dynamic_image) = cx.paint_state.renderer_mut().finish();
+        let (encoder, frame, view, resolve_view, dynamic_image) =
+            cx.paint_state.renderer_mut().finish();
 
         if (encoder.is_some() && frame.is_some() && view.is_some()) {
             self.call_encode_callback(
                 encoder.expect("Couldn't get encoder"),
                 frame.expect("Couldn't get frame"),
                 view.expect("Couldn't get view"),
+                resolve_view.expect("Couldn't get resolve view"),
             );
         } else {
             println!("Requesting redraw...");
@@ -694,6 +698,7 @@ impl WindowHandle {
             dyn for<'a> Fn(
                     wgpu::CommandEncoder,
                     wgpu::SurfaceTexture,
+                    wgpu::TextureView,
                     wgpu::TextureView,
                     &'a WindowHandle,
                 ) + 'static,
@@ -714,9 +719,10 @@ impl WindowHandle {
         command_encoder: wgpu::CommandEncoder,
         frame: wgpu::SurfaceTexture,
         view: wgpu::TextureView,
+        resolve_view: wgpu::TextureView,
     ) {
         if let Some(callback) = &self.encode_callback {
-            callback(command_encoder, frame, view, self);
+            callback(command_encoder, frame, view, resolve_view, self);
         }
     }
 
@@ -1689,7 +1695,7 @@ impl GpuHelper {
                     depth_or_array_layers: 1,
                 },
                 mip_level_count: 1,
-                sample_count: 1,
+                sample_count: 4, // used in a multisampled environment
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Depth24Plus,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT

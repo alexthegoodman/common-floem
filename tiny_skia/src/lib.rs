@@ -551,6 +551,7 @@ impl<W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle
         Option<wgpu::CommandEncoder>,
         Option<wgpu::SurfaceTexture>,
         Option<wgpu::TextureView>,
+        Option<wgpu::TextureView>,
         Option<DynamicImage>,
     ) {
         // Remove cache entries which were not accessed.
@@ -575,6 +576,6 @@ impl<W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle
             .present()
             .expect("failed to present the surface buffer");
 
-        (None, None, None, None)
+        (None, None, None, None, None)
     }
 }

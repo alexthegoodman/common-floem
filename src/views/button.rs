@@ -22,9 +22,12 @@ impl Button {
         Button { id }.keyboard_navigatable().class(ButtonClass)
     }
 
-    pub fn action(self, mut on_press: impl FnMut() + 'static) -> Self {
+    pub fn action(self, mut on_press: Option<impl FnMut() + 'static>) -> Self {
         self.on_click_stop(move |_| {
-            on_press();
+            if (on_press.is_some()) {
+                let mut on_press = on_press.as_mut().expect("Couldn't get onpress");
+                on_press();
+            }
         })
     }
 }

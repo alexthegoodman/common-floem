@@ -59,6 +59,7 @@ pub trait Renderer {
         Option<wgpu::CommandEncoder>,
         Option<wgpu::SurfaceTexture>,
         Option<wgpu::TextureView>,
+        Option<wgpu::TextureView>,
         Option<DynamicImage>,
     );
     // where
