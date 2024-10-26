@@ -107,8 +107,11 @@ pub struct WindowHandle {
     pub depth_view: Option<wgpu::TextureView>,
     pub window_size: Option<WindowSize>,
     pub handle_mouse_input: Option<Box<dyn Fn(MouseButton, ElementState)>>,
-    pub handle_cursor_moved: Option<Box<dyn Fn(f64, f64)>>,
+    pub handle_cursor_moved: Option<Box<dyn Fn(f64, f64, f64, f64)>>,
     pub handle_window_resized: Option<Box<dyn FnMut(PhysicalSize<u32>, LogicalSize<f64>)>>,
+    pub handle_mouse_wheel: Option<Box<dyn FnMut(MouseScrollDelta)>>,
+    pub handle_keyboard_input: Option<Box<dyn FnMut(floem_winit::event::KeyEvent)>>,
+    pub handle_modifiers_changed: Option<Box<dyn FnMut(floem_winit::event::Modifiers)>>,
     pub gpu_helper: Option<Arc<Mutex<GpuHelper>>>,
 }
 
@@ -206,7 +209,10 @@ impl WindowHandle {
             handle_mouse_input: None,
             handle_cursor_moved: None,
             handle_window_resized: None,
+            handle_keyboard_input: None,
+            handle_modifiers_changed: None,
             gpu_helper: None,
+            handle_mouse_wheel: None,
         };
         window_handle.app_state.set_root_size(size.get_untracked());
         if let Some(theme) = theme.get_untracked() {

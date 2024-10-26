@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem, rc::Rc};
+use std::{collections::HashMap, mem, rc::Rc, time::Duration};
 
 use floem_reactive::SignalUpdate;
 
@@ -220,11 +220,24 @@ impl ApplicationHandle {
                 ..
             } => {
                 if !is_synthetic {
-                    window_handle.key_event(event);
+                    window_handle.key_event(event.clone());
+
+                    if (window_handle.handle_keyboard_input.is_some()) {
+                        window_handle
+                            .handle_keyboard_input
+                            .as_mut()
+                            .expect("Couldn't get callback")(event.clone());
+                    }
                 }
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 window_handle.modifiers_changed(modifiers.state());
+                if (window_handle.handle_modifiers_changed.is_some()) {
+                    window_handle
+                        .handle_modifiers_changed
+                        .as_mut()
+                        .expect("Couldn't get callback")(modifiers);
+                }
             }
             WindowEvent::Ime(ime) => {
                 window_handle.ime(ime);
@@ -238,7 +251,12 @@ impl ApplicationHandle {
                     window_handle
                         .handle_cursor_moved
                         .as_ref()
-                        .expect("Couldn't get callback")(position.x, position.y);
+                        .expect("Couldn't get callback")(
+                        position.x,
+                        position.y,
+                        position_logical.x,
+                        position_logical.y,
+                    );
                 }
             }
             WindowEvent::CursorEntered { .. } => {}
@@ -247,6 +265,12 @@ impl ApplicationHandle {
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 window_handle.mouse_wheel(delta);
+                if (window_handle.handle_mouse_wheel.is_some()) {
+                    window_handle
+                        .handle_mouse_wheel
+                        .as_mut()
+                        .expect("Couldn't get callback")(delta);
+                }
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 window_handle.mouse_input(button, state);
@@ -273,14 +297,33 @@ impl ApplicationHandle {
             WindowEvent::MenuAction(id) => {
                 window_handle.menu_action(id);
             }
+            // WindowEvent::RedrawRequested => {
+            //     window_handle.render_frame();
+            //     // window_handle.call_render_callback();
+            //     window_handle
+            //         .window
+            //         .as_ref()
+            //         .expect("Couldn't get window")
+            //         .request_redraw();
+            // }
             WindowEvent::RedrawRequested => {
+                // Control frame rate at the start of the handler
+                let frame_duration = Duration::from_secs_f64(1.0 / 60.0);
+                let start_time = Instant::now();
+
                 window_handle.render_frame();
                 // window_handle.call_render_callback();
+
                 window_handle
                     .window
                     .as_ref()
                     .expect("Couldn't get window")
                     .request_redraw();
+
+                let elapsed_time = start_time.elapsed();
+                if elapsed_time < frame_duration {
+                    std::thread::sleep(frame_duration - elapsed_time);
+                }
             }
         }
 
