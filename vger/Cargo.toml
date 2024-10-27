@@ -17,7 +17,7 @@ wgpu = { workspace = true }
 futures = "0.3.26"
 anyhow = "1.0.69"
 swash = "0.1.8"
-floem-vger-rs = { path = "C:/Users/alext/projects/common/common-vger-rs", package = "floem-vger"}
+floem-vger-rs = { path = "D:/projects/common/common-vger-rs", package = "floem-vger"}
 floem_renderer = { path = "../renderer", version = "0.1.0" }
 
 
