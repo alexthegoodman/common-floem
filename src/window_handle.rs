@@ -7,6 +7,7 @@ use std::{
 };
 
 use common_vector::{basic::WindowSize, editor::Editor};
+use midpoint_engine::core::RendererState::RendererState;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{Duration, Instant};
 #[cfg(target_arch = "wasm32")]
@@ -103,9 +104,12 @@ pub struct WindowHandle {
     >,
     pub gpu_resources: Option<Arc<GpuResources>>,
     pub user_editor: Option<Arc<Mutex<Editor>>>,
+    pub user_engine: Option<Arc<Mutex<RendererState>>>,
     pub render_pipeline: Option<wgpu::RenderPipeline>,
     pub depth_view: Option<wgpu::TextureView>,
-    pub window_size: Option<WindowSize>,
+    // pub window_size: Option<WindowSize>,
+    pub window_width: Option<u32>,
+    pub window_height: Option<u32>,
     pub handle_mouse_input: Option<Box<dyn Fn(MouseButton, ElementState)>>,
     pub handle_cursor_moved: Option<Box<dyn Fn(f64, f64, f64, f64)>>,
     pub handle_window_resized: Option<Box<dyn FnMut(PhysicalSize<u32>, LogicalSize<f64>)>>,
@@ -202,9 +206,12 @@ impl WindowHandle {
             render_callback: None,
             gpu_resources: None, // not the Reciever, but actual resources
             user_editor: None,
+            user_engine: None,
             render_pipeline: None,
             depth_view: None,
-            window_size: None,
+            // window_size: None,
+            window_height: None,
+            window_width: None,
             encode_callback: None,
             handle_mouse_input: None,
             handle_cursor_moved: None,
@@ -222,8 +229,13 @@ impl WindowHandle {
     }
 
     pub(crate) fn init_renderer(&mut self) {
-        self.paint_state
-            .init_renderer(self.gpu_resources.clone(), self.window_size);
+        self.paint_state.init_renderer(
+            self.gpu_resources.clone(),
+            Some(WindowSize {
+                width: self.window_width.expect("Couldn't get window width"),
+                height: self.window_height.expect("Couldn't get window height"),
+            }),
+        );
         // On the web, we need to get the canvas size once. The size will be updated automatically
         // when the canvas element is resized subsequently. This is the correct place to do so
         // because the renderer is not initialized until now.
@@ -1694,14 +1706,16 @@ impl GpuHelper {
     pub fn recreate_depth_view(
         &mut self,
         gpu_resources: &std::sync::Arc<GpuResources>,
-        window_size: &WindowSize,
+        // window_size: &WindowSize,
+        window_width: u32,
+        window_height: u32,
     ) {
         let depth_texture = gpu_resources
             .device
             .create_texture(&wgpu::TextureDescriptor {
                 size: wgpu::Extent3d {
-                    width: window_size.width.clone(),
-                    height: window_size.height.clone(),
+                    width: window_width.clone(),
+                    height: window_height.clone(),
                     depth_or_array_layers: 1,
                 },
                 mip_level_count: 1,

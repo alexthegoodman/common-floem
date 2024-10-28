@@ -48,6 +48,15 @@ pub fn create_icon(name: &str) -> String {
         "triangle" => include_str!("../assets/triangle-thin.svg"),
         "dot" => include_str!("../assets/dot-outline-thin.svg"),
         "dots-vertical" => include_str!("../assets/dots-three-outline-vertical-thin.svg"),
+        "sphere" => include_str!("../assets/sphere-thin.svg"),
+        "gizmo" => include_str!("../assets/vector-three-thin.svg"),
+        "book" => include_str!("../assets/book-open-thin.svg"),
+        "cube" => include_str!("../assets/cube-focus-thin.svg"),
+        "faders" => include_str!("../assets/faders-thin.svg"),
+        "map" => include_str!("../assets/map-trifold-thin.svg"),
+        "panorama" => include_str!("../assets/panorama-thin.svg"),
+        "speedometer" => include_str!("../assets/speedometer-thin.svg"),
+        "folder-plus" => include_str!("../assets/folder-plus-thin.svg"),
         _ => "",
     };
 
