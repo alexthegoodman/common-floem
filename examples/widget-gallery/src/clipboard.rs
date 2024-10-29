@@ -13,25 +13,25 @@ pub fn clipboard_view() -> impl IntoView {
     form({
         (
             form_item("Simple copy".to_string(), 120.0, move || {
-                button("Copy the answer").action(move || {
+                button("Copy the answer").action(Some(move || {
                     let _ = Clipboard::set_contents("42".to_string());
-                })
+                }))
             }),
             form_item("Copy from input".to_string(), 120.0, move || {
                 h_stack((
                     text_input(text1).keyboard_navigatable(),
-                    button("Copy").action(move || {
+                    button("Copy").action(Some(move || {
                         let _ = Clipboard::set_contents(text1.get());
-                    }),
+                    })),
                 ))
             }),
             form_item("Get clipboard".to_string(), 120.0, move || {
                 v_stack((
-                    button("Get clipboard").action(move || {
+                    button("Get clipboard").action(Some(move || {
                         if let Ok(content) = Clipboard::get_contents() {
                             text2.set(content);
                         }
-                    }),
+                    })),
                     label(move || text2.get()),
                 ))
             }),

@@ -19,5 +19,5 @@ anyhow = "1.0.69"
 swash = "0.1.8"
 floem-vger-rs = { path = "D:/projects/common/common-vger-rs", package = "floem-vger"}
 floem_renderer = { path = "../renderer", version = "0.1.0" }
-
+sha2 = "0.10.8"
 

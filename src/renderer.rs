@@ -240,6 +240,7 @@ impl<W: wgpu::WindowHandle> floem_renderer::Renderer for Renderer<W> {
     }
 
     fn draw_img(&mut self, img: Img<'_>, rect: Rect) {
+        // println!("draw_img");
         match self {
             Renderer::Vger(v) => {
                 v.draw_img(img, rect);

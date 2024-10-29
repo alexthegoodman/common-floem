@@ -7,3 +7,4 @@ edition = "2021"
 im.workspace = true
 floem = { path = "../.." }
 strum = { version = "0.25.0", features = ["derive"] }
+bytemuck = "1.19.0"

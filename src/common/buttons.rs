@@ -17,7 +17,7 @@ use crate::views::{h_stack, Decorators};
 use crate::views::{svg, v_stack};
 use crate::{views::button, IntoView};
 use common_vector::basic::rgb_to_wgpu;
-use floem_reactive::SignalGet;
+use floem_reactive::{ReadSignal, SignalGet};
 
 use crate::unit::{DurationUnitExt, UnitExt};
 use once_cell::sync::Lazy;
@@ -250,3 +250,38 @@ pub fn option_button(
 //         EventPropagation::Stop
 //     })
 // }
+
+pub fn tab_button(
+    text: &'static str,
+    // icon_name: &'static str,
+    action: Option<impl FnMut() + 'static>,
+    this_tab: usize,
+    active: ReadSignal<usize>,
+) -> impl IntoView {
+    button(
+        v_stack((
+            // svg(create_icon(icon_name)).style(|s| s.width(30).height(30)),
+            label(move || text).style(|s| s.margin_top(4.0)),
+        ))
+        .style(|s| {
+            s.color(Color::WHITE)
+                .justify_center()
+                .align_items(AlignItems::Center)
+        }),
+    )
+    .action(action)
+    .style(move |s| {
+        s.width(90)
+            .height(30)
+            .justify_center()
+            .align_items(AlignItems::Center)
+            .border(0)
+            .background(Color::DARK_GRAY)
+            .border_radius(5.0)
+            .apply_if(this_tab == active.get(), |s| s.background(Color::BLACK))
+            .transition(Background, Transition::ease_in_out(200.millis()))
+            .focus_visible(|s| s.border(2.).border_color(Color::BLUE))
+            .hover(|s| s.background(Color::DARK_GRAY).cursor(CursorStyle::Pointer))
+            .margin_right(4.0)
+    })
+}

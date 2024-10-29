@@ -94,7 +94,7 @@ pub fn img(image: impl Fn() -> Vec<u8> + 'static) -> Img {
     img_dynamic(move || image::load_from_memory(&image()).ok().map(Rc::new))
 }
 
-pub(crate) fn img_dynamic(image: impl Fn() -> Option<Rc<DynamicImage>> + 'static) -> Img {
+pub fn img_dynamic(image: impl Fn() -> Option<Rc<DynamicImage>> + 'static) -> Img {
     let id = ViewId::new();
     create_effect(move |_| {
         id.update_state(image());
@@ -118,19 +118,30 @@ impl View for Img {
     }
 
     fn update(&mut self, _cx: &mut crate::context::UpdateCx, state: Box<dyn std::any::Any>) {
+        println!("Img::update called");
         if let Ok(img) = state.downcast::<Option<Rc<DynamicImage>>>() {
             self.img_hash = (*img).as_ref().map(|img| {
                 let mut hasher = Sha256::new();
                 hasher.update(img.as_bytes());
-                hasher.finalize().to_vec()
+                let hash = hasher.finalize().to_vec();
+                // println!("  Generated hash of length: {}", hash.len());
+                hash
             });
             self.img = *img;
-            self.img_dimensions = self.img.as_ref().map(|img| img.dimensions());
+            self.img_dimensions = self.img.as_ref().map(|img| {
+                let dims = img.dimensions();
+                // println!("  Set dimensions: {:?}", dims);
+                dims
+            });
             self.id.request_layout();
+            // println!("  Layout requested");
+        } else {
+            println!("  Failed to downcast state to Option<Rc<DynamicImage>>");
         }
     }
 
     fn layout(&mut self, cx: &mut crate::context::LayoutCx) -> taffy::tree::NodeId {
+        // println!("Img::layout called");
         cx.layout_node(self.id(), true, |_cx| {
             if self.content_node.is_none() {
                 self.content_node = Some(
@@ -140,15 +151,19 @@ impl View for Img {
                         .new_leaf(taffy::style::Style::DEFAULT)
                         .unwrap(),
                 );
+                // println!("  Created new content node");
             }
             let content_node = self.content_node.unwrap();
 
             let (width, height) = self.img_dimensions.unwrap_or((0, 0));
+            // println!("  Using dimensions: {}x{}", width, height);
 
             let style = Style::new()
                 .width((width as f64).px())
                 .height((height as f64).px())
                 .to_taffy_style();
+            // println!("  Set style with dimensions");
+
             let _ = self.id.taffy().borrow_mut().set_style(content_node, style);
 
             vec![content_node]
@@ -166,6 +181,9 @@ impl View for Img {
                 },
                 rect,
             );
+            // println!("draw image");
+        } else {
+            println!("  No image to paint");
         }
     }
 }

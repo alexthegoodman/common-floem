@@ -14,6 +14,8 @@ use peniko::{
     kurbo::{Affine, Point, Rect, Shape},
     BrushRef, Color, GradientKind,
 };
+use sha2::Digest;
+use sha2::Sha256;
 use wgpu::{
     Device, DeviceType, Queue, StoreOp, Surface, SurfaceConfiguration, TextureFormat, TextureView,
 };
@@ -32,6 +34,7 @@ pub struct VgerRenderer {
     clip: Option<Rect>,
     capture: bool,
     swash_scaler: SwashScaler,
+    frame_count: u32,
 }
 
 impl VgerRenderer {
@@ -126,6 +129,7 @@ impl VgerRenderer {
             clip: None,
             capture: false,
             swash_scaler: SwashScaler::new(font_embolden),
+            frame_count: 0,
         })
     }
 
@@ -548,6 +552,7 @@ impl Renderer for VgerRenderer {
     }
 
     fn draw_img(&mut self, img: Img<'_>, rect: Rect) {
+        self.frame_count = self.frame_count + 1;
         let transform = self.transform.as_coeffs();
 
         let scale_x = transform[0] * self.scale;
@@ -565,11 +570,19 @@ impl Renderer for VgerRenderer {
         let width = (rect.width() * scale_x).round().max(1.0) as u32;
         let height = (rect.height() * scale_y).round().max(1.0) as u32;
 
+        // Create a unique hash each frame to force rendering
+        // let mut hasher = Sha256::new();
+        // hasher.update(img.hash);
+        // hasher.update(&self.frame_count.to_le_bytes()); // You might need to add frame_count to the renderer
+        // let force_hash = hasher.finalize().to_vec();
+
         self.vger.render_image(x, y, img.hash, width, height, || {
             let rgba = img.img.clone().into_rgba8();
             let data = rgba.as_bytes().to_vec();
 
             let (width, height) = rgba.dimensions();
+
+            println!("render image {:?} {:?} {:?}", width, height, data.len());
 
             Image {
                 width,

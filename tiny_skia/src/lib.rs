@@ -458,6 +458,8 @@ impl<W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle
     }
 
     fn draw_img(&mut self, img: Img<'_>, rect: Rect) {
+        println!("Draw tinyskia");
+
         let rect = try_ret!(self.rect(rect));
         if let Some((color, pixmap)) = self.image_cache.get_mut(img.hash) {
             *color = self.cache_color;

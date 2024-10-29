@@ -1245,7 +1245,11 @@ impl PaintState {
         } = self
         {
             // let gpu_resources = rx.recv().unwrap().unwrap();
-            let gpu_resources = gpu_resources.expect("Couldn't get resources");
+            let gpu_resources = if gpu_resources.is_some() {
+                gpu_resources.expect("Couldn't get resources")
+            } else {
+                Arc::new(rx.recv().unwrap().unwrap())
+            };
             let inner_size = inner_size.expect("Couldn't get inner size");
             let renderer = crate::renderer::Renderer::new(
                 window.clone(),

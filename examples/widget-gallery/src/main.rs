@@ -15,6 +15,7 @@ pub mod slider;
 use floem::{
     event::{Event, EventListener, EventPropagation},
     keyboard::{Key, NamedKey},
+    kurbo::Size,
     peniko::Color,
     reactive::{create_signal, SignalGet, SignalUpdate},
     style::{Background, CursorStyle, Transition},
@@ -23,7 +24,8 @@ use floem::{
         button, h_stack, label, scroll, stack, tab, v_stack, virtual_stack, Decorators,
         VirtualDirection, VirtualItemSize,
     },
-    IntoView, View,
+    window::WindowConfig,
+    Application, IntoView, View,
 };
 
 fn app_view() -> impl IntoView {
@@ -127,7 +129,7 @@ fn app_view() -> impl IntoView {
 
     let id = list.id();
     let inspector = button("Open Inspector")
-        .action(move || id.inspect())
+        .action(Some(move || id.inspect()))
         .style(|s| s);
 
     let left = v_stack((list, inspector)).style(|s| s.height_full().column_gap(5.0));
@@ -170,6 +172,41 @@ fn app_view() -> impl IntoView {
     })
 }
 
+use bytemuck::Contiguous;
+
 fn main() {
-    floem::launch(app_view);
+    // floem::launch(app_view);
+
+    let app = Application::new();
+
+    let monitor = app.primary_monitor().expect("Couldn't get primary monitor");
+    let monitor_size = monitor.size();
+
+    // Calculate a reasonable window size (e.g., 80% of the screen size)
+    let window_width = (monitor_size.width.into_integer() as f32 * 0.5) as u32;
+    let window_height = (monitor_size.height.into_integer() as f32 * 0.5) as u32;
+
+    let (mut app, window_id) = app.window(
+        move |_| app_view(),
+        Some(
+            WindowConfig::default()
+                .size(Size::new(window_width as f64, window_height as f64))
+                .title("Floem Examples"),
+        ),
+    );
+
+    let window_id = window_id.expect("Couldn't get window id");
+
+    {
+        let app_handle = app.handle.as_mut().expect("Couldn't get handle");
+        let window_handle = app_handle
+            .window_handles
+            .get_mut(&window_id)
+            .expect("Couldn't get window handle");
+
+        window_handle.window_width = Some(window_width);
+        window_handle.window_height = Some(window_height);
+    }
+
+    app.run();
 }
