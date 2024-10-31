@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     cell::RefCell,
     mem,
     path::PathBuf,
@@ -6,8 +7,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use common_vector::{basic::WindowSize, editor::Editor};
-use midpoint_engine::core::RendererState::RendererState;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{Duration, Instant};
 #[cfg(target_arch = "wasm32")]
@@ -61,6 +60,12 @@ use crate::{
 
 pub type CustomRenderCallback = Box<dyn for<'a> Fn(&'a RefCell<&WindowHandle>) + 'static>;
 
+#[derive(Debug, Clone, Copy)]
+pub struct WindowSize {
+    pub width: u32,
+    pub height: u32,
+}
+
 /// The top-level window handle that owns the winit Window.
 /// Meant only for use with the root view of the application.
 /// Owns the `AppState` and is responsible for
@@ -103,8 +108,10 @@ pub struct WindowHandle {
         >,
     >,
     pub gpu_resources: Option<Arc<GpuResources>>,
-    pub user_editor: Option<Arc<Mutex<Editor>>>,
-    pub user_engine: Option<Arc<Mutex<RendererState>>>,
+    // pub user_editor: Option<Arc<Mutex<Editor>>>, // vector
+    // pub user_engine: Option<Arc<Mutex<RendererState>>>, // engine
+    // pub user_editor: Option<Arc<Mutex<dyn Any + Send + Sync>>>, // all
+    pub user_editor: Option<Box<dyn Any + Send + Sync>>, // all
     pub render_pipeline: Option<wgpu::RenderPipeline>,
     pub depth_view: Option<wgpu::TextureView>,
     // pub window_size: Option<WindowSize>,
@@ -206,7 +213,7 @@ impl WindowHandle {
             render_callback: None,
             gpu_resources: None, // not the Reciever, but actual resources
             user_editor: None,
-            user_engine: None,
+            // user_engine: None,
             render_pipeline: None,
             depth_view: None,
             // window_size: None,
@@ -227,6 +234,10 @@ impl WindowHandle {
         }
         window_handle
     }
+
+    // pub fn set_editor<T: Any + Send + Sync>(&mut self, editor: Arc<Mutex<T>>) {
+    //     self.user_editor = Some(Arc::new(Mutex::new(editor)));
+    // }
 
     pub(crate) fn init_renderer(&mut self) {
         self.paint_state.init_renderer(

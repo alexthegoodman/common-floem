@@ -1,4 +1,3 @@
-use common_vector::basic::WindowSize;
 use floem_reactive::Scope;
 use floem_renderer::gpu_resources::{self, GpuResourceError, GpuResources};
 use floem_renderer::Renderer as FloemRenderer;
@@ -21,6 +20,7 @@ use crate::animate::{AnimStateKind, RepeatMode};
 use crate::renderer::Renderer;
 use crate::style::DisplayProp;
 use crate::view_state::IsHiddenState;
+use crate::window_handle::WindowSize;
 use crate::{
     action::{exec_after, show_context_menu},
     app_state::AppState,

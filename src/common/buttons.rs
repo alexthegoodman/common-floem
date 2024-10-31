@@ -16,7 +16,6 @@ use crate::views::{
 use crate::views::{h_stack, Decorators};
 use crate::views::{svg, v_stack};
 use crate::{views::button, IntoView};
-use common_vector::basic::rgb_to_wgpu;
 use floem_reactive::{ReadSignal, SignalGet};
 
 use crate::unit::{DurationUnitExt, UnitExt};
@@ -24,6 +23,15 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
+
+pub fn rgb_to_wgpu(r: u8, g: u8, b: u8, a: f32) -> [f32; 4] {
+    [
+        r as f32 / 255.0,
+        g as f32 / 255.0,
+        b as f32 / 255.0,
+        a.clamp(0.0, 1.0),
+    ]
+}
 
 static ICON_CACHE: Lazy<Mutex<HashMap<String, String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
