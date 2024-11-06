@@ -71,6 +71,9 @@ pub fn create_icon(name: &str) -> String {
         "circles" => include_str!("../assets/circles-three-thin.svg"),
         "fast-forward" => include_str!("../assets/fast-forward-thin.svg"),
         "folder-plus" => include_str!("../assets/folder-plus-thin.svg"),
+        "bone" => include_str!("../assets/bone-thin.svg"),
+        "caret-down" => include_str!("../assets/caret-down-thin.svg"),
+        "caret-right" => include_str!("../assets/caret-right-thin.svg"),
         _ => "",
     };
 
