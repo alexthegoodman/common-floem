@@ -190,7 +190,7 @@ pub mod ext_event;
 pub mod file;
 #[cfg(any(feature = "rfd-async-std", feature = "rfd-tokio"))]
 pub mod file_action;
-pub(crate) mod id;
+pub mod id;
 mod inspector;
 pub mod keyboard;
 pub mod menu;

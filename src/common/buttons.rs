@@ -64,6 +64,12 @@ pub fn create_icon(name: &str) -> String {
         "map" => include_str!("../assets/map-trifold-thin.svg"),
         "panorama" => include_str!("../assets/panorama-thin.svg"),
         "speedometer" => include_str!("../assets/speedometer-thin.svg"),
+        "motion-arrow" => include_str!("../assets/arrow-fat-lines-right-thin.svg"),
+        "atom" => include_str!("../assets/atom-thin.svg"),
+        "brain" => include_str!("../assets/brain-thin.svg"),
+        "broadcast" => include_str!("../assets/broadcast-thin.svg"),
+        "circles" => include_str!("../assets/circles-three-thin.svg"),
+        "fast-forward" => include_str!("../assets/fast-forward-thin.svg"),
         "folder-plus" => include_str!("../assets/folder-plus-thin.svg"),
         _ => "",
     };
