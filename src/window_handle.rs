@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use web_time::{Duration, Instant};
 
 use floem_reactive::{with_scope, RwSignal, Scope, SignalGet, SignalUpdate};
-use floem_renderer::gpu_resources::GpuResources;
+use floem_renderer::gpu_resources::{self, GpuResources};
 use floem_renderer::Renderer;
 use floem_winit::{
     dpi::{LogicalPosition, LogicalSize, PhysicalSize},
@@ -66,6 +66,13 @@ pub struct WindowSize {
     pub height: u32,
 }
 
+pub struct EngineHandle {
+    pub user_editor: Option<Box<dyn Any + Send + Sync>>, // all
+    pub render_pipeline: Option<wgpu::RenderPipeline>,
+    pub depth_view: Option<wgpu::TextureView>,
+    pub gpu_helper: Option<Arc<Mutex<GpuHelper>>>,
+}
+
 /// The top-level window handle that owns the winit Window.
 /// Meant only for use with the root view of the application.
 /// Owns the `AppState` and is responsible for
@@ -101,9 +108,16 @@ pub struct WindowHandle {
             dyn for<'a> Fn(
                     wgpu::CommandEncoder,
                     wgpu::SurfaceTexture,
-                    wgpu::TextureView,
-                    wgpu::TextureView,
-                    &'a WindowHandle,
+                    Arc<wgpu::TextureView>,
+                    Arc<wgpu::TextureView>,
+                    // &'a WindowHandle,
+                    &Arc<GpuResources>,
+                    &EngineHandle,
+                ) -> (
+                    Option<wgpu::CommandEncoder>,
+                    Option<wgpu::SurfaceTexture>,
+                    Option<Arc<wgpu::TextureView>>,
+                    Option<Arc<wgpu::TextureView>>,
                 ) + 'static,
         >,
     >,
@@ -111,9 +125,6 @@ pub struct WindowHandle {
     // pub user_editor: Option<Arc<Mutex<Editor>>>, // vector
     // pub user_engine: Option<Arc<Mutex<RendererState>>>, // engine
     // pub user_editor: Option<Arc<Mutex<dyn Any + Send + Sync>>>, // all
-    pub user_editor: Option<Box<dyn Any + Send + Sync>>, // all
-    pub render_pipeline: Option<wgpu::RenderPipeline>,
-    pub depth_view: Option<wgpu::TextureView>,
     // pub window_size: Option<WindowSize>,
     pub window_width: Option<u32>,
     pub window_height: Option<u32>,
@@ -123,7 +134,7 @@ pub struct WindowHandle {
     pub handle_mouse_wheel: Option<Box<dyn FnMut(MouseScrollDelta)>>,
     pub handle_keyboard_input: Option<Box<dyn FnMut(floem_winit::event::KeyEvent)>>,
     pub handle_modifiers_changed: Option<Box<dyn FnMut(floem_winit::event::Modifiers)>>,
-    pub gpu_helper: Option<Arc<Mutex<GpuHelper>>>,
+    pub engine_handle: Option<EngineHandle>,
 }
 
 impl WindowHandle {
@@ -212,10 +223,11 @@ impl WindowHandle {
             dropper_file: None,
             render_callback: None,
             gpu_resources: None, // not the Reciever, but actual resources
-            user_editor: None,
-            // user_engine: None,
-            render_pipeline: None,
-            depth_view: None,
+            // user_editor: None,
+            // // user_engine: None,
+            // render_pipeline: None,
+            // depth_view: None,
+            engine_handle: None,
             // window_size: None,
             window_height: None,
             window_width: None,
@@ -225,7 +237,7 @@ impl WindowHandle {
             handle_window_resized: None,
             handle_keyboard_input: None,
             handle_modifiers_changed: None,
-            gpu_helper: None,
+            // gpu_helper: None,
             handle_mouse_wheel: None,
         };
         window_handle.app_state.set_root_size(size.get_untracked());
@@ -700,23 +712,41 @@ impl WindowHandle {
             }
         }
         // cx.paint_state.renderer_mut().finish()
-        let (encoder, frame, view, resolve_view, dynamic_image) =
-            cx.paint_state.renderer_mut().finish();
+        // let dynamic_image =
+        //     cx.paint_state
+        //         .renderer_mut()
+        //         .finish(|encoder, frame, view, resolve_view| {
+        //             self.call_encode_callback(encoder, frame, view, resolve_view)
+        //         });
 
-        if (encoder.is_some() && frame.is_some() && view.is_some()) {
-            self.call_encode_callback(
-                encoder.expect("Couldn't get encoder"),
-                frame.expect("Couldn't get frame"),
-                view.expect("Couldn't get view"),
-                resolve_view.expect("Couldn't get resolve view"),
-            );
-        } else {
-            println!("Requesting redraw...");
-            self.window
-                .as_ref()
-                .expect("Window as ref")
-                .request_redraw();
-        }
+        let encode_callback = self.encode_callback.as_ref().map(|cb| cb.clone());
+
+        let gpu_resources = self
+            .gpu_resources
+            .as_ref()
+            .expect("Couldn't get GPU Resources");
+        let engine_handle = self
+            .engine_handle
+            .as_ref()
+            .expect("Couldn't get engine handle");
+
+        let dynamic_image =
+            cx.paint_state
+                .renderer_mut()
+                .finish(|encoder, frame, view, resolve_view| {
+                    if let Some(callback) = encode_callback {
+                        callback(
+                            encoder,
+                            frame,
+                            view,
+                            resolve_view,
+                            gpu_resources,
+                            engine_handle,
+                        )
+                    } else {
+                        (None, None, None, None)
+                    }
+                });
 
         dynamic_image
     }
@@ -727,9 +757,16 @@ impl WindowHandle {
             dyn for<'a> Fn(
                     wgpu::CommandEncoder,
                     wgpu::SurfaceTexture,
-                    wgpu::TextureView,
-                    wgpu::TextureView,
-                    &'a WindowHandle,
+                    Arc<wgpu::TextureView>,
+                    Arc<wgpu::TextureView>,
+                    // &'a WindowHandle,
+                    &Arc<GpuResources>,
+                    &EngineHandle,
+                ) -> (
+                    Option<wgpu::CommandEncoder>,
+                    Option<wgpu::SurfaceTexture>,
+                    Option<Arc<wgpu::TextureView>>,
+                    Option<Arc<wgpu::TextureView>>,
                 ) + 'static,
         >,
     ) {
@@ -747,11 +784,34 @@ impl WindowHandle {
         &mut self,
         command_encoder: wgpu::CommandEncoder,
         frame: wgpu::SurfaceTexture,
-        view: wgpu::TextureView,
-        resolve_view: wgpu::TextureView,
+        view: Arc<wgpu::TextureView>,
+        resolve_view: Arc<wgpu::TextureView>,
+    ) -> (
+        Option<wgpu::CommandEncoder>,
+        Option<wgpu::SurfaceTexture>,
+        Option<Arc<wgpu::TextureView>>,
+        Option<Arc<wgpu::TextureView>>,
     ) {
         if let Some(callback) = &self.encode_callback {
-            callback(command_encoder, frame, view, resolve_view, self);
+            let gpu_resources = self
+                .gpu_resources
+                .as_ref()
+                .expect("Couldn't get GPU Resources");
+            let engine_handle = self
+                .engine_handle
+                .as_ref()
+                .expect("Couldn't get engine handle");
+
+            callback(
+                command_encoder,
+                frame,
+                view,
+                resolve_view,
+                gpu_resources,
+                engine_handle,
+            )
+        } else {
+            (None, None, None, None)
         }
     }
 

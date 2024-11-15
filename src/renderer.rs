@@ -293,19 +293,24 @@ impl<W: wgpu::WindowHandle> floem_renderer::Renderer for Renderer<W> {
         }
     }
 
-    fn finish(
-        &mut self,
-    ) -> (
-        Option<wgpu::CommandEncoder>,
-        Option<wgpu::SurfaceTexture>,
-        Option<wgpu::TextureView>,
-        Option<wgpu::TextureView>,
-        Option<DynamicImage>,
-    ) {
+    fn finish<F>(&mut self, callback: F) -> Option<DynamicImage>
+    where
+        F: FnOnce(
+            wgpu::CommandEncoder,
+            wgpu::SurfaceTexture,
+            Arc<wgpu::TextureView>,
+            Arc<wgpu::TextureView>,
+        ) -> (
+            Option<wgpu::CommandEncoder>,
+            Option<wgpu::SurfaceTexture>,
+            Option<Arc<wgpu::TextureView>>,
+            Option<Arc<wgpu::TextureView>>,
+        ),
+    {
         match self {
-            Renderer::Vger(r) => r.finish(),
-            Renderer::TinySkia(r) => r.finish(),
-            Renderer::Uninitialized { .. } => (None, None, None, None, None),
+            Renderer::Vger(r) => r.finish(callback),
+            Renderer::TinySkia(r) => r.finish(callback),
+            Renderer::Uninitialized { .. } => None,
         }
     }
 }

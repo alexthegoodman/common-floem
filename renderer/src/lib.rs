@@ -1,6 +1,8 @@
 pub mod swash;
 pub mod text;
 
+use std::sync::Arc;
+
 use image::DynamicImage;
 use peniko::{
     kurbo::{Affine, Point, Rect, Shape},
@@ -53,15 +55,19 @@ pub trait Renderer {
 
     fn draw_img(&mut self, img: Img<'_>, rect: Rect);
 
-    fn finish(
-        &mut self,
-    ) -> (
-        Option<wgpu::CommandEncoder>,
-        Option<wgpu::SurfaceTexture>,
-        Option<wgpu::TextureView>,
-        Option<wgpu::TextureView>,
-        Option<DynamicImage>,
-    );
+    fn finish<F>(&mut self, callback: F) -> Option<DynamicImage>
+    where
+        F: FnOnce(
+            wgpu::CommandEncoder,
+            wgpu::SurfaceTexture,
+            Arc<wgpu::TextureView>,
+            Arc<wgpu::TextureView>,
+        ) -> (
+            Option<wgpu::CommandEncoder>,
+            Option<wgpu::SurfaceTexture>,
+            Option<Arc<wgpu::TextureView>>,
+            Option<Arc<wgpu::TextureView>>,
+        );
     // where
     //     F: FnOnce(&Self, &mut wgpu::CommandEncoder);
 }

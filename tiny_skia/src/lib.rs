@@ -17,6 +17,7 @@ use softbuffer::{Context, Surface};
 use std::collections::HashMap;
 use std::num::NonZeroU32;
 use std::rc::Rc;
+use std::sync::Arc;
 
 macro_rules! try_ret {
     ($e:expr) => {
@@ -546,16 +547,22 @@ impl<W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle
         self.clip = None;
     }
 
-    fn finish(
-        &mut self,
-        // encode_callback: F,
-    ) -> (
-        Option<wgpu::CommandEncoder>,
-        Option<wgpu::SurfaceTexture>,
-        Option<wgpu::TextureView>,
-        Option<wgpu::TextureView>,
-        Option<DynamicImage>,
-    ) {
+    fn finish<F>(&mut self, callback: F) -> Option<DynamicImage>
+    where
+        F: FnOnce(
+            wgpu::CommandEncoder,
+            wgpu::SurfaceTexture,
+            Arc<wgpu::TextureView>,
+            Arc<wgpu::TextureView>,
+        ) -> (
+            Option<wgpu::CommandEncoder>,
+            Option<wgpu::SurfaceTexture>,
+            Option<Arc<wgpu::TextureView>>,
+            Option<Arc<wgpu::TextureView>>,
+        ),
+    {
+        // TODO: run callback? unnecessary on CPU?
+
         // Remove cache entries which were not accessed.
         self.image_cache.retain(|_, (c, _)| *c == self.cache_color);
         self.glyph_cache.retain(|_, (c, _)| *c == self.cache_color);
@@ -578,6 +585,7 @@ impl<W: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle
             .present()
             .expect("failed to present the surface buffer");
 
-        (None, None, None, None, None)
+        // (None, None, None, None, None)
+        None
     }
 }

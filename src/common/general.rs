@@ -1,7 +1,7 @@
 use floem_reactive::create_rw_signal;
 
 use crate::peniko::Color;
-use crate::style::Style;
+use crate::style::{Style, TextOverflow};
 use crate::view::View;
 use crate::views::container;
 use crate::views::{h_stack, label};
@@ -40,7 +40,7 @@ impl AlertVariant {
                 Color::rgb8(22, 163, 74),   // text-green-600
             ),
             AlertVariant::Info => (
-                Color::rgb8(239, 246, 255), // bg-blue-50
+                Color::rgb8(167, 209, 242), // bg-blue-50
                 Color::rgb8(37, 99, 235),   // text-blue-600
             ),
             AlertVariant::Error => (
@@ -58,11 +58,21 @@ impl AlertVariant {
 pub fn alert(variant: AlertVariant, message: String) -> impl View {
     let (bg_color, text_color) = variant.get_colors();
 
-    container((label(move || message.clone()).style(move |s| s.color(text_color).font_size(14.0))))
-        .style(move |s| {
-            s.padding(12.0)
-                .border_radius(6.0)
-                .background(bg_color)
-                .width_full()
-        })
+    container(
+        (label(move || message.clone()).style(move |s| {
+            s.color(text_color)
+                .font_size(11.0)
+                .line_height(1.5)
+                .width(260.0)
+                .text_overflow(TextOverflow::Wrap)
+        })),
+    )
+    .style(move |s| {
+        s.padding(6.0)
+            .border_radius(6.0)
+            .background(bg_color)
+            .border(1.0)
+            .border_color(text_color)
+            .width(260.0)
+    })
 }

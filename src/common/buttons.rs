@@ -74,6 +74,9 @@ pub fn create_icon(name: &str) -> String {
         "bone" => include_str!("../assets/bone-thin.svg"),
         "caret-down" => include_str!("../assets/caret-down-thin.svg"),
         "caret-right" => include_str!("../assets/caret-right-thin.svg"),
+        "translate" => include_str!("../assets/arrows-out-cardinal-thin.svg"),
+        "rotate" => include_str!("../assets/arrows-clockwise-thin.svg"),
+        "scale" => include_str!("../assets/resize-thin.svg"),
         _ => "",
     };
 
@@ -120,6 +123,43 @@ pub fn small_button(
             .focus_visible(|s| s.border(2.).border_color(Color::BLUE))
             .hover(|s| s.background(Color::LIGHT_GRAY).cursor(CursorStyle::Pointer))
             .z_index(20)
+    })
+}
+
+pub fn toggle_button(
+    text: &'static str,
+    icon_name: &'static str,
+    this_toggle: String,
+    action: impl FnMut(&Event) + 'static,
+    active: RwSignal<String>,
+) -> impl IntoView {
+    button(
+        h_stack((
+            svg(create_icon(icon_name)).style(|s| s.width(24).height(24).color(Color::BLACK)),
+            if text.len() > 0 {
+                label(move || text).style(|s| s.margin_left(4.0))
+            } else {
+                label(move || text)
+            },
+        ))
+        .style(|s| s.justify_center().align_items(AlignItems::Center)),
+    )
+    .on_click_stop(action)
+    .style(move |s| {
+        s.height(28)
+            .justify_center()
+            .align_items(AlignItems::Center)
+            .background(Color::WHITE)
+            .border(1)
+            .border_color(Color::DARK_GRAY)
+            .border_radius(15)
+            .padding(4.0)
+            .transition(Background, Transition::ease_in_out(200.millis()))
+            .focus_visible(|s| s.border(2.).border_color(Color::BLUE))
+            .hover(|s| s.background(Color::LIGHT_GRAY).cursor(CursorStyle::Pointer))
+            .apply_if(this_toggle == active.get(), |s| {
+                s.background(Color::GRAY).color(Color::WHITE_SMOKE)
+            })
     })
 }
 

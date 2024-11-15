@@ -35,6 +35,8 @@ pub struct VgerRenderer {
     capture: bool,
     swash_scaler: SwashScaler,
     frame_count: u32,
+    pub multisampled_texture: Arc<wgpu::Texture>,
+    pub multisampled_view: Arc<wgpu::TextureView>,
 }
 
 impl VgerRenderer {
@@ -119,6 +121,30 @@ impl VgerRenderer {
         // let device = Arc::clone(&device.clone());
         // let queue = Arc::clone(&queue);
 
+        let multisampled_texture = gpu_resources
+            .device
+            .create_texture(&wgpu::TextureDescriptor {
+                size: wgpu::Extent3d {
+                    width: config.width,
+                    height: config.height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 4,
+                dimension: wgpu::TextureDimension::D2,
+                format: config.format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                label: Some("Multisampled render texture"),
+                view_formats: &[],
+            });
+
+        let multisampled_texture = Arc::new(multisampled_texture);
+
+        let multisampled_view =
+            multisampled_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        let multisampled_view = Arc::new(multisampled_view);
+
         Ok(Self {
             gpu_resources,
             vger,
@@ -130,6 +156,8 @@ impl VgerRenderer {
             capture: false,
             swash_scaler: SwashScaler::new(font_embolden),
             frame_count: 0,
+            multisampled_texture,
+            multisampled_view,
         })
     }
 
@@ -210,15 +238,7 @@ impl VgerRenderer {
         floem_vger_rs::defs::LocalRect::new(origin, size)
     }
 
-    fn render_image(
-        &mut self,
-    ) -> (
-        Option<wgpu::CommandEncoder>,
-        Option<wgpu::SurfaceTexture>,
-        Option<wgpu::TextureView>,
-        Option<wgpu::TextureView>,
-        Option<DynamicImage>,
-    ) {
+    fn render_image(&mut self, encoder: &mut wgpu::CommandEncoder) -> Option<DynamicImage> {
         let width_align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT - 1;
         let width = (self.config.width + width_align) & !width_align;
         let height = self.config.height;
@@ -238,6 +258,7 @@ impl VgerRenderer {
         };
         let texture = self.gpu_resources.device.create_texture(&texture_desc);
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = Arc::new(view);
         let desc = wgpu::RenderPassDescriptor {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &view,
@@ -250,7 +271,8 @@ impl VgerRenderer {
             ..Default::default()
         };
 
-        self.vger.encode(&desc);
+        // self.vger.encode(&desc);
+        self.vger.run_render_pass(&desc, encoder);
 
         let bytes_per_pixel = 4;
         let buffer = self
@@ -282,9 +304,10 @@ impl VgerRenderer {
             texture_desc.size,
         );
         // TODO: reimplemnt on stunts
-        // let command_buffer = encoder.finish();
-        // self.gpu_resources.queue.submit(Some(command_buffer));
-        // self.gpu_resources.device.poll(wgpu::Maintain::Wait);
+        // TODO: reimplement now with switched render passes?
+        let command_buffer = encoder.finish();
+        self.gpu_resources.queue.submit(Some(command_buffer));
+        self.gpu_resources.device.poll(wgpu::Maintain::Wait);
 
         let slice = buffer.slice(..);
         let (tx, rx) = sync_channel(1);
@@ -312,14 +335,15 @@ impl VgerRenderer {
             cursor += bytes_per_row as usize;
         }
 
-        (
-            Some(encoder),
-            None,
-            None,
-            Some(view),
-            RgbaImage::from_raw(self.config.width, height, cropped_buffer)
-                .map(DynamicImage::ImageRgba8),
-        )
+        // (
+        //     Some(encoder),
+        //     None,
+        //     None,
+        //     Some(view),
+        //     RgbaImage::from_raw(self.config.width, height, cropped_buffer)
+        //         .map(DynamicImage::ImageRgba8),
+        // )
+        RgbaImage::from_raw(self.config.width, height, cropped_buffer).map(DynamicImage::ImageRgba8)
     }
 }
 
@@ -686,127 +710,94 @@ impl Renderer for VgerRenderer {
         self.clip = None;
     }
 
-    fn finish(
-        &mut self,
-    ) -> (
-        Option<wgpu::CommandEncoder>,
-        Option<wgpu::SurfaceTexture>,
-        Option<TextureView>,
-        Option<TextureView>,
-        Option<DynamicImage>,
-    ) {
-        if self.capture {
-            self.render_image()
-        } else {
-            // Create a multisampled texture (do this once, not every frame)
-            let multisampled_texture =
-                self.gpu_resources
-                    .device
-                    .create_texture(&wgpu::TextureDescriptor {
-                        size: wgpu::Extent3d {
-                            width: self.config.width,
-                            height: self.config.height,
-                            depth_or_array_layers: 1,
-                        },
-                        mip_level_count: 1,
-                        sample_count: 4, // Match this with your depth texture
-                        dimension: wgpu::TextureDimension::D2,
-                        format: self.config.format,
-                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                        label: Some("Multisampled render texture"),
-                        view_formats: &[],
-                    });
+    fn finish<F>(&mut self, callback: F) -> Option<DynamicImage>
+    where
+        F: FnOnce(
+            wgpu::CommandEncoder,
+            wgpu::SurfaceTexture,
+            Arc<wgpu::TextureView>,
+            Arc<wgpu::TextureView>,
+        ) -> (
+            Option<wgpu::CommandEncoder>,
+            Option<wgpu::SurfaceTexture>,
+            Option<Arc<wgpu::TextureView>>,
+            Option<Arc<wgpu::TextureView>>,
+        ),
+    {
+        if let Ok(frame) = self.gpu_resources.surface.get_current_texture() {
+            let texture_view = frame
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
 
-            let multisampled_view =
-                multisampled_texture.create_view(&wgpu::TextureViewDescriptor::default());
+            let texture_view = Arc::new(texture_view);
 
-            if let Ok(frame) = self.gpu_resources.surface.get_current_texture() {
-                let texture_view = frame
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
+            let desc = wgpu::RenderPassDescriptor {
+                label: None,
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &self.multisampled_view,       // Use the multisampled view here
+                    resolve_target: Some(&texture_view), // Resolve to the swapchain texture
+                    ops: wgpu::Operations {
+                        // load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        // store: StoreOp::Store,
+                        load: wgpu::LoadOp::Load,
+                        // store: wgpu::StoreOp::Store,
+                        store: wgpu::StoreOp::Discard,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                // depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                //     view: &depth_view,
+                //     depth_ops: Some(wgpu::Operations {
+                //         load: wgpu::LoadOp::Clear(1.0),
+                //         store: StoreOp::Store,
+                //     }),
+                //     stencil_ops: None,
+                // }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            };
 
-                // let multisampled_depth_texture =
-                //     self.gpu_resources
-                //         .device
-                //         .create_texture(&wgpu::TextureDescriptor {
-                //             size: wgpu::Extent3d {
-                //                 width: self.config.width,
-                //                 height: self.config.height,
-                //                 depth_or_array_layers: 1,
-                //             },
-                //             mip_level_count: 1,
-                //             sample_count: 4,
-                //             dimension: wgpu::TextureDimension::D2,
-                //             format: wgpu::TextureFormat::Depth24Plus,
-                //             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                //             label: Some("Multisampled Depth Texture"),
-                //             view_formats: &[],
-                //         });
+            let mut encoder = self.vger.encode(&desc);
 
-                // let depth_view =
-                //     multisampled_depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-                let desc = wgpu::RenderPassDescriptor {
-                    label: None,
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &multisampled_view,            // Use the multisampled view here
-                        resolve_target: Some(&texture_view), // Resolve to the swapchain texture
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                            store: StoreOp::Store,
-                        },
-                    })],
-                    // depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    //     view: &self.depth_view.as_ref().unwrap(), // Your multisampled depth view
-                    //     depth_ops: Some(wgpu::Operations {
-                    //         load: wgpu::LoadOp::Clear(1.0),
-                    //         store: true,
-                    //     }),
-                    //     stencil_ops: None,
-                    // }),
-                    depth_stencil_attachment: None,
-                    // depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    //     view: &depth_view,
-                    //     depth_ops: Some(wgpu::Operations {
-                    //         load: wgpu::LoadOp::Clear(1.0),
-                    //         store: StoreOp::Store,
-                    //     }),
-                    //     stencil_ops: None,
-                    // }),
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                };
-                // if let Ok(frame) = self.gpu_resources.surface.get_current_texture() {
-                //     let texture_view = frame
-                //         .texture
-                //         .create_view(&wgpu::TextureViewDescriptor::default());
-                // let desc = wgpu::RenderPassDescriptor {
-                //     label: None,
-                //     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                //         view: &texture_view,
-                //         resolve_target: None,
-                //         ops: wgpu::Operations {
-                //             load: wgpu::LoadOp::Clear(wgpu::Color::RED),
-                //             store: StoreOp::Store,
-                //         },
-                //     })],
-                //     depth_stencil_attachment: None,
-                //     timestamp_writes: None,
-                //     occlusion_query_set: None,
-                // };
-
-                let encoder = self.vger.encode(&desc);
-                // frame.present();
-
-                return (
-                    encoder,
-                    Some(frame),
-                    Some(multisampled_view),
-                    Some(texture_view),
-                    None,
+            if self.capture {
+                self.render_image(encoder.as_mut().expect("Couldn't get encoder"))
+            } else {
+                // render pass 1 (user app)
+                let (mut encoder, frame, multi_view, texture_view_updated) = callback(
+                    encoder.expect("Couldn't get encoder"),
+                    frame,
+                    self.multisampled_view.clone(),
+                    texture_view.clone(),
                 );
+
+                let mut encoder = encoder.expect("Couldn't get encoder");
+                let frame = frame.expect("Couldn't get frame");
+                let multi_view = multi_view.expect("Couldn't get multi_view");
+                let texture_view_updated =
+                    texture_view_updated.expect("Couldn't get texture_view_updated");
+
+                // render pass 2 (floem and vger)
+                self.vger.run_render_pass(&desc, &mut encoder);
+
+                // present both passes
+                let command_buffer = encoder.finish();
+                self.gpu_resources.queue.submit(Some(command_buffer));
+                self.gpu_resources.device.poll(wgpu::Maintain::Poll);
+                frame.present();
+
+                // return (
+                //     Some(encoder),
+                //     Some(frame),
+                //     Some(multi_view.clone()),
+                //     Some(texture_view_updated),
+                //     None,
+                // );
+
+                // (None, None, None, None, None)
+                None
             }
-            (None, None, None, None, None)
+        } else {
+            None
         }
     }
 }
