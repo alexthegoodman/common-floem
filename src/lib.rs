@@ -210,7 +210,7 @@ pub(crate) mod view_storage;
 pub mod view_tuple;
 pub mod views;
 pub mod window;
-mod window_handle;
+pub mod window_handle;
 mod window_id;
 mod window_tracking;
 

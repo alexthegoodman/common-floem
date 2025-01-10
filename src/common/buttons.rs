@@ -77,6 +77,9 @@ pub fn create_icon(name: &str) -> String {
         "translate" => include_str!("../assets/arrows-out-cardinal-thin.svg"),
         "rotate" => include_str!("../assets/arrows-clockwise-thin.svg"),
         "scale" => include_str!("../assets/resize-thin.svg"),
+        "image" => include_str!("../assets/image-thin.svg"),
+        "text" => include_str!("../assets/text-t-thin.svg"),
+        "video" => include_str!("../assets/video-thin.svg"),
         _ => "",
     };
 
@@ -116,6 +119,30 @@ pub fn small_button(
             } else {
                 Color::WHITE
             })
+            .border(0)
+            // .border_color(Color::BLACK)
+            .border_radius(15)
+            .transition(Background, Transition::ease_in_out(200.millis()))
+            .focus_visible(|s| s.border(2.).border_color(Color::BLUE))
+            .hover(|s| s.background(Color::LIGHT_GRAY).cursor(CursorStyle::Pointer))
+            .z_index(20)
+    })
+}
+
+pub fn simple_button(text: String, action: impl FnMut(&Event) + 'static) -> impl IntoView {
+    button(
+        h_stack((if text.len() > 0 {
+            label(move || text.clone()).style(|s| s.margin_left(4.0))
+        } else {
+            label(move || text.clone())
+        },))
+        .style(|s| s.justify_center().align_items(AlignItems::Center)),
+    )
+    .on_click_stop(action)
+    .style(move |s| {
+        s.height(28)
+            .justify_center()
+            .align_items(AlignItems::Center)
             .border(0)
             // .border_color(Color::BLACK)
             .border_radius(15)
