@@ -165,6 +165,35 @@ impl VgerRenderer {
         if width != self.config.width || height != self.config.height {
             self.config.width = width;
             self.config.height = height;
+
+            let multisampled_texture =
+                self.gpu_resources
+                    .device
+                    .create_texture(&wgpu::TextureDescriptor {
+                        size: wgpu::Extent3d {
+                            width: self.config.width,
+                            height: self.config.height,
+                            depth_or_array_layers: 1,
+                        },
+                        mip_level_count: 1,
+                        sample_count: 4,
+                        dimension: wgpu::TextureDimension::D2,
+                        format: self.config.format,
+                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                        label: Some("Multisampled render texture"),
+                        view_formats: &[],
+                    });
+
+            let multisampled_texture = Arc::new(multisampled_texture);
+
+            let multisampled_view =
+                multisampled_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+            let multisampled_view = Arc::new(multisampled_view);
+
+            self.multisampled_texture = multisampled_texture;
+            self.multisampled_view = multisampled_view;
+
             self.gpu_resources
                 .surface
                 .configure(&self.gpu_resources.device, &self.config);
