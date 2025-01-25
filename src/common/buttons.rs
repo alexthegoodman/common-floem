@@ -10,8 +10,8 @@ use crate::reactive::RwSignal;
 use crate::style::{Background, CursorStyle, Transition};
 use crate::taffy::AlignItems;
 use crate::views::{
-    container, dyn_container, empty, label, scroll, stack, tab, text_input, virtual_stack,
-    VirtualDirection, VirtualItemSize,
+    container, dyn_container, empty, label, scroll, stack, static_label, tab, text_input, tooltip,
+    virtual_stack, VirtualDirection, VirtualItemSize,
 };
 use crate::views::{h_stack, Decorators};
 use crate::views::{svg, v_stack};
@@ -80,6 +80,9 @@ pub fn create_icon(name: &str) -> String {
         "image" => include_str!("../assets/image-thin.svg"),
         "text" => include_str!("../assets/text-t-thin.svg"),
         "video" => include_str!("../assets/video-thin.svg"),
+        "copy" => include_str!("../assets/copy-thin.svg"),
+        "trash" => include_str!("../assets/trash-thin.svg"),
+        "x" => include_str!("../assets/x-thin.svg"),
         _ => "",
     };
 
@@ -151,6 +154,36 @@ pub fn simple_button(text: String, action: impl FnMut(&Event) + 'static) -> impl
             .hover(|s| s.background(Color::LIGHT_GRAY).cursor(CursorStyle::Pointer))
             .z_index(20)
     })
+}
+
+pub fn icon_button(
+    icon_name: &str,
+    tooltip_text: String,
+    action: impl FnMut(&Event) + 'static,
+) -> impl IntoView {
+    tooltip(
+        button(
+            h_stack((
+                svg(create_icon(icon_name)).style(|s| s.width(20).height(20).color(Color::BLACK)),
+            ))
+            .style(|s| s.justify_center().align_items(AlignItems::Center)),
+        )
+        .on_click_stop(action)
+        .style(move |s| {
+            s.height(28)
+                .width(28.0)
+                .justify_center()
+                .align_items(AlignItems::Center)
+                .border(0)
+                // .border_color(Color::BLACK)
+                .border_radius(15)
+                .transition(Background, Transition::ease_in_out(200.millis()))
+                .focus_visible(|s| s.border(2.).border_color(Color::BLUE))
+                .hover(|s| s.background(Color::LIGHT_GRAY).cursor(CursorStyle::Pointer))
+                .z_index(20)
+        }),
+        move || static_label(&tooltip_text),
+    )
 }
 
 pub fn toggle_button(

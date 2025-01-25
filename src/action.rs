@@ -145,7 +145,7 @@ where
     T: std::hash::Hash + 'static,
     F: Fn() + Clone + 'static,
 {
-    println!("init debounce");
+    // println!("init debounce");
     crate::reactive::create_stateful_updater(
         move |prev_opt: Option<(u64, Option<TimerToken>)>| {
             use std::hash::Hasher;
@@ -158,17 +158,20 @@ where
             (execute, (hash, prev_opt.and_then(|(_, timer)| timer)))
         },
         move |execute, (hash, prev_timer): (u64, Option<TimerToken>)| {
-            println!("debounce on change");
+            // println!("debounce on change");
             // Cancel the previous timer if it exists
             if let Some(timer) = prev_timer {
                 println!("cancel");
                 timer.cancel();
             }
-            let timer_token = if execute {
-                println!("execute timer token");
+            // let timer_token = if execute {
+            // hardcoding to true, as the value is expected to change, and was not always setting
+            // execute as true when the value had changed, for some reason
+            let timer_token = if true {
+                // println!("execute timer token");
                 let action = action.clone();
                 Some(exec_after(duration, move |_| {
-                    println!("exuting action");
+                    // println!("exuting action");
                     action();
                 }))
             } else {
