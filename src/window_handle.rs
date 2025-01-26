@@ -67,7 +67,8 @@ pub struct WindowSize {
 }
 
 pub struct EngineHandle {
-    pub user_editor: Option<Box<dyn Any + Send + Sync>>, // all
+    // pub user_editor: Option<Box<dyn Any + Send + Sync>>, // all
+    pub user_editor: Option<Box<dyn Any>>, // all
     pub render_pipeline: Option<wgpu::RenderPipeline>,
     pub depth_view: Option<wgpu::TextureView>,
     pub gpu_helper: Option<Arc<Mutex<GpuHelper>>>,
