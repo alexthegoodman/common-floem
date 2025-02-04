@@ -55,7 +55,10 @@ impl VgerRenderer {
         //     queue,
         // } = gpu_resources;
         let gpu_resources_ref = gpu_resources.as_ref();
-        let surface = &gpu_resources_ref.surface;
+        let surface = &gpu_resources_ref
+            .surface
+            .as_ref()
+            .expect("Couldn't get gpu surface");
         let adapter = &gpu_resources_ref.adapter;
         let device = &gpu_resources_ref.device;
         let queue = &gpu_resources_ref.queue;
@@ -194,9 +197,13 @@ impl VgerRenderer {
             self.multisampled_texture = multisampled_texture;
             self.multisampled_view = multisampled_view;
 
-            self.gpu_resources
+            let surface = self
+                .gpu_resources
                 .surface
-                .configure(&self.gpu_resources.device, &self.config);
+                .as_ref()
+                .expect("Couldn't get gpu surface");
+
+            surface.configure(&self.gpu_resources.device, &self.config);
         }
         self.scale = scale;
     }
@@ -753,7 +760,13 @@ impl Renderer for VgerRenderer {
             Option<Arc<wgpu::TextureView>>,
         ),
     {
-        if let Ok(frame) = self.gpu_resources.surface.get_current_texture() {
+        let surface = self
+            .gpu_resources
+            .surface
+            .as_ref()
+            .expect("Couldn't get gpu surface");
+
+        if let Ok(frame) = surface.get_current_texture() {
             let texture_view = frame
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default());

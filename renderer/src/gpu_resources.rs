@@ -20,7 +20,7 @@ pub struct GpuResources {
     /// The rendering surface, representing the window or screen where the graphics will be displayed.
     /// It is the interface between wgpu and the platform's windowing system, enabling rendering
     /// onto the screen.
-    pub surface: wgpu::Surface<'static>,
+    pub surface: Option<wgpu::Surface<'static>>,
 
     /// The adapter that represents the GPU or a rendering backend. It provides information about
     /// the capabilities of the hardware and is used to request a logical device (`wgpu::Device`).
@@ -80,11 +80,15 @@ impl GpuResources {
                     return;
                 };
 
+                // Enable the TEXTURE_FORMAT_NV12 (YUV) feature
+                // let required_features = wgpu::Features::TEXTURE_FORMAT_NV12;
+
                 tx.send(
                     adapter
                         .request_device(
                             &wgpu::DeviceDescriptor {
                                 label: None,
+                                // required_features,
                                 ..Default::default()
                             },
                             None,
@@ -92,7 +96,7 @@ impl GpuResources {
                         .await
                         .map_err(GpuResourceError::DeviceRequestError)
                         .map(|(device, queue)| Self {
-                            surface,
+                            surface: Some(surface),
                             adapter,
                             device,
                             queue,
