@@ -169,6 +169,10 @@ impl VgerRenderer {
             self.config.width = width;
             self.config.height = height;
 
+            if width < 10 || height < 10 {
+                return;
+            }
+
             let multisampled_texture =
                 self.gpu_resources
                     .device

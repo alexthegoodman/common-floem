@@ -469,6 +469,10 @@ impl WindowHandle {
     }
 
     pub(crate) fn size(&mut self, size: Size) {
+        if size.width < 10.0 || size.height < 10.0 {
+            return;
+        }
+
         self.size.set(size);
         self.app_state.update_screen_size_bp(size);
         self.event(Event::WindowResized(size));

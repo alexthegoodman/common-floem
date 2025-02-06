@@ -345,6 +345,41 @@ pub fn option_button(
     })
 }
 
+// pub fn option_button_once(
+//     text: &'static str,
+//     icon_name: &'static str,
+//     action: impl FnOnce() + 'static,
+//     active: bool,
+// ) -> impl IntoView {
+//     button(
+//         v_stack((
+//             svg(create_icon(icon_name)).style(|s| s.width(24).height(24)),
+//             label(move || text).style(|s| s.margin_top(4.0).font_size(9.0)),
+//         ))
+//         .style(|s| s.justify_center().align_items(AlignItems::Center)),
+//     )
+//     // .action(action)
+//     .on_click(move |_| {
+//         // let action = action.expect("Couldn't get action");
+
+//         action();
+
+//         EventPropagation::Stop
+//     })
+//     .style(move |s| {
+//         s.width(60)
+//             .height(60)
+//             .justify_center()
+//             .align_items(AlignItems::Center)
+//             .border(1.0)
+//             .border_color(Color::GRAY)
+//             .border_radius(15)
+//             .transition(Background, Transition::ease_in_out(200.millis()))
+//             .focus_visible(|s| s.border(2.).border_color(Color::BLUE))
+//             .hover(|s| s.background(Color::LIGHT_GRAY).cursor(CursorStyle::Pointer))
+//     })
+// }
+
 // pub fn layer_button(layer_name: String, icon_name: &'static str) -> impl IntoView {
 //     h_stack((
 //         svg(create_icon(icon_name))
